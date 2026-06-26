@@ -5,25 +5,36 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+
 	"go.uber.org/zap"
+	"github.com/arunishshekhar/harbr/internal/config"
 )
 
 type Manager struct {
-	tunnelID string
-	nodeRole string
-	localIP  string
-	domain   string
-	logger   *zap.Logger
+	cfg    *config.Config
+	logger *zap.Logger
 }
 
-func New(logger *zap.Logger) *Manager {
+func New(cfg *config.Config, logger *zap.Logger) *Manager {
 	return &Manager{
+		cfg:    cfg,
 		logger: logger,
 	}
 }
 
 func (m *Manager) Start(ctx context.Context) {
 	m.logger.Info("tunnel manager starting")
+	if m.cfg.Node.AccessMode != "tunnel" {
+		m.logger.Info("not in tunnel mode, skipping")
+		return
+	}
+	tunnelID := os.Getenv("CLOUDFLARE_TUNNEL_ID")
+	credsJSON := os.Getenv("CLOUDFLARE_TUNNEL_CREDENTIALS")
+	if tunnelID != "" && credsJSON != "" {
+		if err := m.Setup(ctx, tunnelID, credsJSON); err != nil {
+			m.logger.Error("tunnel setup failed", zap.Error(err))
+		}
+	}
 	<-ctx.Done()
 }
 
@@ -33,7 +44,16 @@ func (m *Manager) Setup(ctx context.Context, tunnelID, credentialsJSON string) e
 		return err
 	}
 
-	caddyURL := fmt.Sprintf("http://%s:80", m.localIP)
+	localIP := m.cfg.Node.TailscaleIP
+	if localIP == "" {
+		localIP = "127.0.0.1"
+	}
+	caddyURL := fmt.Sprintf("http://%s:80", localIP)
+
+	domain := m.cfg.Cloudflare.Zones["primary"]
+	if domain == "" {
+		domain = os.Getenv("HARBR_DOMAIN")
+	}
 
 	config := fmt.Sprintf(`
 tunnel: %s
@@ -48,7 +68,7 @@ ingress:
     originRequest:
       noTLSVerify: true
   - service: http_status:404
-`, tunnelID, m.domain, caddyURL, m.domain, caddyURL)
+`, tunnelID, domain, caddyURL, domain, caddyURL)
 
 	if err := os.WriteFile("/etc/cloudflared/config.yml", []byte(config), 0644); err != nil {
 		return err

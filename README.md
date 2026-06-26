@@ -8,6 +8,8 @@
 
 > Documentation site: [arunishshekhar.github.io/harbr](https://arunishshekhar.github.io/harbr)
 
+**Latest: v0.1.2** — Interactive setup wizard, Postgres-based leader election, real K8s pod observation, expanded CLI (15 commands), structured config loading.
+
 ---
 
 ## Features
@@ -103,12 +105,12 @@ sequenceDiagram
 
 **Go Daemon (`daemon/`)**
 - `harbr` — CLI frontend with interactive TUI (setup, status, node join, logs)
-- `harbrd` — background daemon with 5 goroutines:
-  - **Reconciler** — every 30s, detects drift in project deployments
-  - **Health** — HTTP server on `:8080/healthz` for K8s liveness probes
-  - **Leader** — PostgreSQL-based lease acquisition every 15s
-  - **Tunnel manager** — configures cloudflared (Tunnel mode)
-  - **DNS failover agent** — monitors/fails over DNS records (Direct mode)
+- `harbrd` — background daemon:
+  - **Reconciler** — 30s cycle, real K8s pod observation via `client-go`, detects drift (pod missing, crash loop, wrong image), auto-restarts failed pods
+  - **Leader election** — Postgres `leader_leases` table with `SELECT FOR UPDATE`, 30s expiry, proper release on shutdown
+  - **Health** — HTTP server on `:7700/healthz`
+  - **Tunnel manager** — configures cloudflared (Tunnel mode) via env vars
+  - **DNS failover agent** — TCP health checks every 30s, failover after 3 consecutive failures (Direct mode)
 
 **NestJS API (`api/`)**
 - 21 feature modules (auth, users, nodes, projects, builds, deployments, k8s, caddy, domains, storage, templates, webhooks, alerts, audit, jobs, network, logs, db_connections, system, database)
@@ -193,7 +195,7 @@ git push origin main   # triggers auto-build + deploy
 
 | Component | Technology |
 |---|---|
-| **Daemon** | Go 1.24 (pgx, zap) |
+| **Daemon** | Go 1.24 (pgx, zap, k8s client-go, Bubbletea, Lipgloss) |
 | **API** | Node 24, NestJS 11 (BullMQ, JWT, Passport) |
 | **UI** | React 19, Vite 6, TanStack Query 5, React Router 7 |
 | **Container** | K3s + Cilium CNI + Longhorn storage |
@@ -230,13 +232,20 @@ harbr/
 ## Administration
 
 ```bash
-harbr status     # Cluster health
-harbr nodes      # List cluster nodes
-harbr projects   # List all projects
-harbr logs myapp # Stream real-time project logs
-harbr events     # Hardware event feed
-harbr version    # Version info
-harbr update     # Self-update via SSH-triggered updater
+harbr setup              # Interactive TUI setup wizard
+harbr status             # Cluster health
+harbr nodes              # List cluster nodes
+harbr ps                 # List running projects
+harbr projects           # List all projects
+harbr logs myapp         # Stream real-time project logs
+harbr exec myapp         # Open shell in container
+harbr env list myapp     # Show environment variables
+harbr env set myapp K=V  # Set env var (triggers redeploy)
+harbr deploy myapp       # Trigger deployment
+harbr rollback myapp     # Rollback deployment
+harbr events             # Hardware event feed
+harbr version            # Version info
+harbr update             # Self-update
 ```
 
 ## Development

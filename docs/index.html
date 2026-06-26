@@ -29,6 +29,7 @@
     <p class="tagline">
       Harbr is a self-hosted PaaS that turns a cluster of bare-metal or VM nodes into a full-featured
       application platform — no cloud vendor lock-in, no Docker Compose spaghetti.
+      <br><span style="color:var(--text-muted);font-size:.9rem">v0.1.2 — Interactive setup wizard, Postgres leader election, real K8s pod observation, 15 CLI commands</span>
     </p>
     <div class="btn-row">
       <a class="btn btn-primary" href="#usage">
@@ -170,11 +171,11 @@
       <div class="arch-col">
         <h4>Go Daemon (<code>harbrd</code>)</h4>
         <ul>
-          <li>Reconciler — 30s cycle, detects drift</li>
-          <li>Leader election — PostgreSQL lease</li>
-          <li>Tunnel manager — cloudflared config</li>
-          <li>DNS failover agent</li>
-          <li>Health endpoint + SSH keygen</li>
+          <li>Reconciler — 30s cycle, real K8s pod observation via client-go, drift detection + auto-recovery</li>
+          <li>Leader election — Postgres advisory lock, 30s expiry, proper release on shutdown</li>
+          <li>Tunnel manager — cloudflared config via env vars</li>
+          <li>DNS failover agent — TCP health checks, failover after 3 misses</li>
+          <li>Health endpoint :7700 + SSH keygen</li>
         </ul>
       </div>
       <div class="arch-col">
