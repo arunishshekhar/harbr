@@ -38,6 +38,7 @@ else
   MODE="fresh"
 fi
 
+# shellcheck source=/dev/null
 . /etc/os-release
 [[ "$ID" == "ubuntu" ]] || error "Ubuntu required. Detected: $PRETTY_NAME"
 [[ "$VERSION_ID" == "22.04" || "$VERSION_ID" == "24.04" ]] ||

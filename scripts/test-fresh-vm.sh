@@ -11,8 +11,15 @@ echo "=== Harbr Fresh VM Test ==="
 echo ""
 
 # 1. OS check
-. /etc/os-release
-[ "$ID" = "ubuntu" ] && [ "${VERSION_ID}" = "24.04" ] && pass "Ubuntu 24.04 detected" || fail "Not Ubuntu 24.04"
+if [ -f /etc/os-release ]; then
+  # shellcheck source=/dev/null
+  . /etc/os-release
+fi
+if [ "$ID" = "ubuntu" ] && [ "${VERSION_ID}" = "24.04" ]; then
+  pass "Ubuntu 24.04 detected"
+else
+  fail "Not Ubuntu 24.04"
+fi
 
 # 2. Architecture
 case "$(uname -m)" in
@@ -22,28 +29,52 @@ case "$(uname -m)" in
 esac
 
 # 3. Root access
-[ "$EUID" -eq 0 ] && pass "Running as root" || fail "Not running as root"
+if [ "$EUID" -eq 0 ]; then
+  pass "Running as root"
+else
+  fail "Not running as root"
+fi
 
 # 4. Internet connectivity
-curl -fsSL https://google.com > /dev/null && pass "Internet connectivity" || fail "No internet"
+if curl -fsSL https://google.com > /dev/null; then
+  pass "Internet connectivity"
+else
+  fail "No internet"
+fi
 
 # 5. PostgreSQL 16 install
 apt-get install -y postgresql postgresql-client 2>/dev/null
-pg_isready -q && pass "PostgreSQL running" || fail "PostgreSQL not running"
+if pg_isready -q; then
+  pass "PostgreSQL running"
+else
+  fail "PostgreSQL not running"
+fi
 
 # 6. Tailscale install
 curl -fsSL https://tailscale.com/install.sh | sh 2>/dev/null
-which tailscale && pass "Tailscale installed" || fail "Tailscale not installed"
+if which tailscale; then
+  pass "Tailscale installed"
+else
+  fail "Tailscale not installed"
+fi
 
 # 7. K3s install
 curl -sfL https://get.k3s.io | sh -s - --cluster-init 2>/dev/null
-which k3s && pass "K3s installed" || fail "K3s not installed"
+if which k3s; then
+  pass "K3s installed"
+else
+  fail "K3s not installed"
+fi
 
 # 8. Harbr download and verify
 VERSION="${HARBR_VERSION:-v0.1.0}"
 ARCH="amd64"
 curl -fsSL "https://github.com/arunishshekhar/harbr/releases/download/${VERSION}/harbr-linux-${ARCH}" -o /tmp/harbr-test
-file /tmp/harbr-test | grep -q ELF && pass "Harbr binary downloaded" || fail "Harbr binary invalid"
+if file /tmp/harbr-test | grep -q ELF; then
+  pass "Harbr binary downloaded"
+else
+  fail "Harbr binary invalid"
+fi
 
 echo ""
 echo "=== All fresh VM tests passed ==="
