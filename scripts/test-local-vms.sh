@@ -90,7 +90,11 @@ print(len(nodes))
   local http_code
   http_code=$(kubectl exec test-curl -- curl -s -o /dev/null -w "%{http_code}" http://test-nginx 2>/dev/null || echo "000")
   kubectl delete pod test-curl --force --grace-period=0 2>/dev/null || true
-  [ "$http_code" = "200" ] && pass "Service reachable (HTTP $http_code)" || fail "Service not reachable (HTTP $http_code)"
+  if [ "$http_code" = "200" ]; then
+    pass "Service reachable (HTTP $http_code)"
+  else
+    fail "Service not reachable (HTTP $http_code)"
+  fi
 
   kubectl delete deployment test-nginx service/test-nginx 2>/dev/null || true
   pass "Cluster health verified"
@@ -210,7 +214,11 @@ EOF
   local http_code2
   http_code2=$(kubectl exec test-curl2 -- curl -s -o /dev/null -w "%{http_code}" http://hello-harbr.hello-harbr.svc.cluster.local 2>/dev/null || echo "000")
   kubectl delete pod test-curl2 --force --grace-period=0 2>/dev/null || true
-  [ "$http_code2" = "200" ] && pass "Project service reachable via cluster DNS (HTTP $http_code2)" || fail "Project service unreachable (HTTP $http_code2)"
+  if [ "$http_code2" = "200" ]; then
+    pass "Project service reachable via cluster DNS (HTTP $http_code2)"
+  else
+    fail "Project service unreachable (HTTP $http_code2)"
+  fi
 }
 
 # ── Step 5: Run database migrations ────────────────────────────────────
@@ -218,9 +226,6 @@ step5() {
   info "Step 5/6: Running database migrations against PostgreSQL..."
 
   local pg_host="localhost"
-  local pg_port="5432"
-  local pg_user="harbr"
-  local pg_db="harbr"
   local pg_pass="harbr-test-2026"
 
   # Check if existing PG container is running

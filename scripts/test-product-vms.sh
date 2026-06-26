@@ -2,7 +2,7 @@
 # Harbr Product Test — follows README install flow on a 2-node cluster
 set -euo pipefail
 
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
+GREEN='\033[0;32m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
 info()  { echo -e "${CYAN}[INFO]${NC} $1"; }
 pass()  { echo -e "${GREEN}[PASS]${NC} $1"; }
 fail()  { echo -e "${RED}[FAIL]${NC} $1"; exit 1; }
@@ -153,7 +153,11 @@ EOF
   local http_code
   http_code=$(kubectl logs job/curl-test -n hello-harbr 2>/dev/null || echo "000")
   kubectl delete job/curl-test -n hello-harbr --force --grace-period=0 2>/dev/null || true
-  [ "$http_code" = "200" ] && pass "Service reachable via cluster DNS (HTTP 200)" || fail "Service unreachable (HTTP $http_code)"
+  if [ "$http_code" = "200" ]; then
+    pass "Service reachable via cluster DNS (HTTP 200)"
+  else
+    fail "Service unreachable (HTTP $http_code)"
+  fi
 }
 
 # ── Step 6: Run DB migrations ──────────────────────────────────────────
