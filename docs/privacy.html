@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Harbr</title>
+<meta name="description" content="Harbr Privacy Policy">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <a href="/" class="logo"><span>Harbr</span></a>
+    <div class="links">
+      <a href="/">Home</a>
+      <a href="https://github.com/arunishshekhar/harbr" target="_blank">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<section>
+  <div class="container legal">
+    <h1>Privacy Policy</h1>
+    <p class="date">Last updated: June 26, 2026</p>
+
+    <h2>1. What Harbr Collects</h2>
+    <p>Harbr is a self-hosted application deployment platform that runs entirely on your own infrastructure. As such:</p>
+    <ul>
+      <li><strong>No telemetry.</strong> Harbr does not collect usage statistics, crash reports, or any other telemetry data.</li>
+      <li><strong>No external analytics.</strong> The web UI contains no analytics scripts, trackers, or third-party cookies.</li>
+      <li><strong>No data leaves your cluster.</strong> All data — application code, container images, logs, database records — stays within your K3s cluster and the PostgreSQL database you provision.</li>
+    </ul>
+
+    <h2>2. Data Stored</h2>
+    <p>Harbr stores the following data in its PostgreSQL database:</p>
+    <ul>
+      <li>User accounts (username, bcrypt password hash, role, token version)</li>
+      <li>Project configurations (Git URL, environment variables, resource limits)</li>
+      <li>Build and deployment history</li>
+      <li>Webhook delivery logs</li>
+      <li>Audit trail of administrative actions</li>
+      <li>Cloudflare API tokens (if using Tunnel or Direct access modes)</li>
+    </ul>
+
+    <h2>3. Cloudflare Integration</h2>
+    <p>If you configure Cloudflare Tunnel or Direct DNS-01 access modes, Harbr uses your Cloudflare API token to:</p>
+    <ul>
+      <li>Create and manage Cloudflare Tunnel connections</li>
+      <li>Provision DNS records for deployed applications</li>
+      <li>Obtain wildcard TLS certificates via DNS-01 challenge</li>
+    </ul>
+    <p>Cloudflare API tokens are stored in your PostgreSQL database and never transmitted to third parties.</p>
+
+    <h2>4. Third-Party Services</h2>
+    <p>The only external service Harbr communicates with is:</p>
+    <ul>
+      <li><strong>GitHub</strong> — if you configure webhooks, GitHub sends push event payloads to your Harbr API endpoint. Content is verified using HMAC-SHA256 signatures.</li>
+      <li><strong>Cloudflare</strong> — if you configure Tunnel or Direct access modes.</li>
+      <li><strong>Container registries</strong> — if you configure external registry mirrors or push to Docker Hub.</li>
+    </ul>
+    <p>All other communication is internal to your cluster.</p>
+
+    <h2>5. Data Retention</h2>
+    <ul>
+      <li>Audit logs: 90 days (monthly partitions, automatically dropped after 90 days)</li>
+      <li>Build logs: retained until the build Job's TTL expires (1 hour after completion)</li>
+      <li>Webhook delivery logs: periodically cleaned up</li>
+      <li>JWT blocklist entries: automatically expired</li>
+    </ul>
+
+    <h2>6. Security</h2>
+    <ul>
+      <li>Passwords are hashed with bcrypt (cost factor 12)</li>
+      <li>JWT tokens include a jti claim for session-level revocation</li>
+      <li>All API endpoints are rate-limited (20 req/s short window, 200 req/min long window)</li>
+      <li>Network policies restrict pod-to-pod communication within the cluster</li>
+      <li>Sensitive ports (22, 6379, 6443, 8080, etc.) and internal CIDRs are blocked from external proxy access</li>
+    </ul>
+
+    <h2>7. Your Control</h2>
+    <p>Since Harbr runs entirely on your own hardware, you have full control over all data. You can:</p>
+    <ul>
+      <li>Delete user accounts and associated data at any time</li>
+      <li>Remove projects, builds, and deployments</li>
+      <li>Drop the PostgreSQL database to erase all stored data</li>
+      <li>Disconnect external services (GitHub webhooks, Cloudflare) at any time</li>
+    </ul>
+
+    <h2>8. Changes</h2>
+    <p>This privacy policy may be updated as Harbr evolves. Since Harbr is open source (MIT License), you can review all changes in the project repository.</p>
+
+    <h2>9. Contact</h2>
+    <p>For questions about this privacy policy, open an issue at <a href="https://github.com/arunishshekhar/harbr">github.com/arunishshekhar/harbr</a>.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="links">
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms &amp; Conditions</a>
+      <a href="https://github.com/arunishshekhar/harbr" target="_blank">GitHub</a>
+    </div>
+    <p>&copy; 2026 Harbr. Released under the MIT License.</p>
+  </div>
+</footer>
+
+</body>
+</html>

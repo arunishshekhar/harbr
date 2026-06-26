@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harbr — Homelab Deployment Platform</title>
+<meta name="description" content="Deploy applications on your own hardware with one command. Harbr is a self-hosted PaaS for K3s + Cilium + Longhorn clusters.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <a href="/" class="logo"><span>Harbr</span></a>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#usage">Usage</a>
+      <a href="#templates">Templates</a>
+      <a href="https://github.com/arunishshekhar/harbr" target="_blank">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <h1>Deploy apps on your own hardware<br>with <span style="color:var(--accent)">one command</span></h1>
+    <p class="tagline">
+      Harbr is a self-hosted PaaS that turns a cluster of bare-metal or VM nodes into a full-featured
+      application platform — no cloud vendor lock-in, no Docker Compose spaghetti.
+    </p>
+    <div class="btn-row">
+      <a class="btn btn-primary" href="#usage">
+        <span class="btn-icon">&#9654;</span> Get Started
+      </a>
+      <a class="btn" href="https://github.com/arunishshekhar/harbr" target="_blank">
+        <span class="btn-icon">&#9660;</span> View on GitHub
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <h2>Everything you need to <span class="accent">self-host</span></h2>
+    <p class="subtitle">Harbr combines the ease of a PaaS with the control of bare-metal — automated builds, zero-downtime deploys, and built-in observability.</p>
+
+    <div class="features">
+
+      <div class="card">
+        <div class="icon">&#9889;</div>
+        <h3>One-command deploy</h3>
+        <p>Push code via <code>git push</code> or use the web dashboard — Harbr builds containers with Kaniko and rolls out zero-downtime deployments automatically.</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128218;</div>
+        <h3>50+ app templates</h3>
+        <p>Databases (PostgreSQL, MySQL, Redis, MongoDB), CMS (WordPress, Strapi), AI/LLM (Ollama, LocalAI), media servers (Jellyfin), and many more — pre-configured and ready to deploy.</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128736;</div>
+        <h3>GitOps pipeline</h3>
+        <p>GitHub webhooks with HMAC verification trigger automated Kaniko builds. Build cache with weekly cleanup and 80% storage alerts keep things fast.</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#9632;</div>
+        <h3>Multi-node cluster</h3>
+        <p>K3s with Cilium CNI and Longhorn replicated storage across primary + worker nodes. Secure join tokens for node enrollment.</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128274;</div>
+        <h3>Network & security</h3>
+        <p>CiliumNetworkPolicy enforcement, JWT auth with jti-based revocation, RBAC (admin/operator/deployer/viewer), rate limiting, and external proxy validation against blocked CIDRs/ports.</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#127758;</div>
+        <h3>Three access modes</h3>
+        <p><strong>Tunnel</strong> — Cloudflare Tunnel (zero open ports), <strong>Direct</strong> — DNS-01 wildcard certs via Caddy, or <strong>Local</strong> — Tailscale SSH. Automatic DNS failover.</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128200;</div>
+        <h3>Monitoring & alerts</h3>
+        <p>Loki log aggregation (30-day retention), Promtail log shipping, configurable alert thresholds per project/node with multiple notification channels.</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128451;</div>
+        <h3>Audit trail</h3>
+        <p>Full CRUD audit log with monthly partitions and 90-day auto-retention. Track hardware events per node with automatic detection.</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128190;</div>
+        <h3>CLI + Web UI</h3>
+        <p>React 19 dashboard with real-time status, plus a Go CLI with interactive TUI for setup, joins, logs, and cluster management.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section id="architecture" style="background: radial-gradient(ellipse at 50% 100%, rgba(31,111,235,.06) 0%, transparent 60%);">
+  <div class="container">
+    <h2>How it <span class="accent">works</span></h2>
+    <p class="subtitle">Every component runs inside your K3s cluster — no external cloud dependencies.</p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+        graph TB
+          subgraph Browser["Browser / CLI"]
+            UI["React 19 UI<br/>(Vite + TanStack Query)"]:::ui
+            CLI["harbr CLI<br/>(Go TUI)"]:::cli
+          end
+
+          subgraph Cluster["Your K3s Cluster"]
+            Caddy["Caddy v2<br/>Reverse Proxy<br/>Port 80 / 443"]:::k8s
+            API["NestJS 11 API<br/>REST :3000"]:::api
+            Worker["BullMQ Worker<br/>(Build Queue Consumer)"]:::api
+
+            subgraph Storage["Storage Layer"]
+              PG[("PostgreSQL 16<br/>(CNPG Operator)")]:::db
+              Redis[("Redis 7.4<br/>(Queue + Cache)")]:::db
+              Loki[("Loki<br/>Log Store")]:::db
+            end
+
+            Kaniko["Kaniko Build Job<br/>(Ephemeral Pod)"]:::build
+            Registry["Registry<br/>(In-cluster :30500)"]:::build
+            Projects["Project Deployments<br/>(Deployment + Service)"]:::k8s
+
+            Caddy --> API
+            API --> Worker
+            Worker --> Kaniko
+            Kaniko --> Registry
+            API --> Projects
+            API --> PG
+            Worker --> Redis
+            API --> Redis
+            API --> Loki
+          end
+
+          CF["Cloudflare<br/>Tunnel / DNS"]:::cloud
+          GH["GitHub<br/>Webhook"]:::cloud
+          User["User / Admin"]:::cloud
+
+          User --> UI & CLI
+          User --> CF
+          CF --> Caddy
+          GH --> API
+
+          classDef ui fill:#1c2128,stroke:#58a6ff,color:#e6edf3
+          classDef cli fill:#1c2128,stroke:#3fb950,color:#e6edf3
+          classDef api fill:#1c2128,stroke:#d29922,color:#e6edf3
+          classDef k8s fill:#1c2128,stroke:#bc8cff,color:#e6edf3
+          classDef db fill:#1c2128,stroke:#f85149,color:#e6edf3
+          classDef build fill:#1c2128,stroke:#56d4dd,color:#e6edf3
+          classDef cloud fill:#1c2128,stroke:#8b949e,color:#8b949e
+      </div>
+    </div>
+
+    <div class="arch-row">
+      <div class="arch-col">
+        <h4>Go Daemon (<code>harbrd</code>)</h4>
+        <ul>
+          <li>Reconciler — 30s cycle, detects drift</li>
+          <li>Leader election — PostgreSQL lease</li>
+          <li>Tunnel manager — cloudflared config</li>
+          <li>DNS failover agent</li>
+          <li>Health endpoint + SSH keygen</li>
+        </ul>
+      </div>
+      <div class="arch-col">
+        <h4>NestJS API</h4>
+        <ul>
+          <li>21 feature modules (auth, projects, builds, k8s, caddy, webhooks, …)</li>
+          <li>bcrypt + JWT auth with jti revocation</li>
+          <li>BullMQ build queue + Kaniko jobs</li>
+          <li>Scheduled cleanup tasks</li>
+          <li>Rate limiting + CIDR validation</li>
+        </ul>
+      </div>
+      <div class="arch-col">
+        <h4>K8s Components</h4>
+        <ul>
+          <li>Caddy reverse proxy (Longhorn PVC)</li>
+          <li>Redis 7.4 (AOF + Longhorn)</li>
+          <li>Loki 2.9 (30-day retention)</li>
+          <li>Promtail DaemonSet</li>
+          <li>CiliumNetworkPolicy enforcement</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Deploy flow diagram -->
+<section>
+  <div class="container">
+    <h2>Deploy <span class="accent">pipeline</span></h2>
+    <p class="subtitle">From <code>git push</code> to live deployment — fully automated.</p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+        sequenceDiagram
+          participant G as GitHub
+          participant H as Harbr API
+          participant Q as Redis Queue
+          participant W as Worker
+          participant K as Kaniko Job
+          participant R as Registry
+          participant K8s as K3s Cluster
+
+          G->>H: Webhook (push event)
+          H->>H: Verify HMAC signature
+          H->>H: Check idempotency
+          H->>Q: Enqueue build job
+          Q->>W: Dequeue build job
+          W->>K: Create Kaniko Job
+          K->>K: Git clone (init container)
+          K->>K: Build container image
+          K->>R: Push image (:30500)
+          R-->>W: Build complete
+          W->>H: Notify build success
+          H->>K8s: Create/update Deployment + Service
+          K8s-->>H: Rollout healthy
+          H->>G: Update commit status
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Usage -->
+<section id="usage" style="background: radial-gradient(ellipse at 50% 100%, rgba(31,111,235,.06) 0%, transparent 60%);">
+  <div class="container">
+    <h2>Get started in <span class="accent">5 minutes</span></h2>
+    <p class="subtitle">Two nodes (or one), Ubuntu 22.04/24.04, Tailscale, and a Cloudflare domain. Everything else is automated.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <h3>Install on the primary node</h3>
+          <p>
+            <pre><code>curl -fsSL https://github.com/arunishshekhar/harbr/releases/latest/download/harbr-linux-amd64 -o harbr
+sudo install harbr /usr/local/bin/
+sudo harbr setup</code></pre>
+            The interactive TUI installs K3s, Cilium, Longhorn, Caddy, Redis, Loki, and Harbr itself.
+          </p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <h3>Join worker nodes</h3>
+          <p>
+            On each additional node, install the binary and run:<br>
+            <pre><code>sudo harbr join &lt;join-token-from-primary&gt;</code></pre>
+            Workers join the cluster with a secure one-time token.
+          </p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <h3>Configure access</h3>
+          <p>In the Settings page, choose your access mode:</p>
+          <div class="tags">
+            <span class="tag">Tunnel — Cloudflare Tunnel (no open ports)</span>
+            <span class="tag">Direct — DNS-01 wildcard certs</span>
+            <span class="tag">Local — Tailscale SSH only</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div>
+          <h3>Deploy your first app</h3>
+          <p>
+            Use the web dashboard or CLI. Pick a template or bring your own Dockerfile:
+            <pre><code># Via CLI
+harbr projects create --name myapp --git https://github.com/user/myapp.git --port 3000
+
+# Or via the web UI
+# Open Dashboard → Deploy → fill in details → Submit</code></pre>
+          </p>
+          <p style="margin-top: 8px; color: var(--text-muted); font-size: .875rem;">
+            Or configure a webhook and deploy with <code>git push</code>.
+          </p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div>
+          <h3>Monitor & manage</h3>
+          <p>
+            Use the CLI to check status, view logs, and manage your cluster:
+            <pre><code>harbr status     # Cluster health
+harbr nodes      # List nodes
+harbr projects   # List projects
+harbr logs myapp # Stream logs
+harbr events     # Hardware events</code></pre>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Templates -->
+<section id="templates">
+  <div class="container">
+    <h2>50+ <span class="accent">one-click</span> templates</h2>
+    <p class="subtitle">Pre-configured application templates across 14 categories — deploy without writing a single line of YAML.</p>
+
+    <div class="features">
+
+      <div class="card">
+        <div class="icon">&#127760;</div>
+        <h3>Web Frameworks</h3>
+        <p>Next.js, SvelteKit, NestJS, FastAPI, Laravel, Rails, Payload CMS</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128451;</div>
+        <h3>Databases</h3>
+        <p>PostgreSQL 16, MySQL 8, Redis 7, MongoDB 7, ClickHouse, Elasticsearch, MinIO</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128221;</div>
+        <h3>CMS</h3>
+        <p>WordPress (stack with MySQL), Ghost, Strapi, Directus</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#127916;</div>
+        <h3>Media</h3>
+        <p>Jellyfin, Immich (stack with Redis + PG), Navidrome, Owncast</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#129302;</div>
+        <h3>AI / LLM</h3>
+        <p>Ollama + WebUI (GPU optional), LocalAI (GPU optional), Stable Diffusion</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128274;</div>
+        <h3>Security / Auth</h3>
+        <p>Authentik (stack with PG + Redis), Authelia, Vaultwarden, WireGuard</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128172;</div>
+        <h3>Communication</h3>
+        <p>Matrix Synapse (stack with PG), Mattermost, Rocket.Chat</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128193;</div>
+        <h3>Storage & Sync</h3>
+        <p>Nextcloud, Seafile</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128200;</div>
+        <h3>Monitoring</h3>
+        <p>Grafana + Prometheus (stack), Uptime Kuma</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128202;</div>
+        <h3>Analytics</h3>
+        <p>Plausible (stack with PG + ClickHouse), Matomo, Umami</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128295;</div>
+        <h3>Dev Tools</h3>
+        <p>VS Code Server (code-server), Woodpecker CI (stack with PG)</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#127966;</div>
+        <h3>VPN / Network</h3>
+        <p>Headscale, Netbird, WireGuard</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128196;</div>
+        <h3>Git Hosting</h3>
+        <p>Gitea, Forgejo</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">&#128233;</div>
+        <h3>Email</h3>
+        <p>Mailu, Stalwart</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- Tech Stack -->
+<section style="background: radial-gradient(ellipse at 50% 100%, rgba(31,111,235,.06) 0%, transparent 60%);">
+  <div class="container">
+    <h2>Built with <span class="accent">modern tools</span></h2>
+    <p class="subtitle">No legacy dependencies — Harbr uses the latest stable versions of every component.</p>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">
+      <div class="card" style="text-align:center;padding:16px">
+        <div style="font-size:.8rem;color:var(--text-muted)">Daemon</div>
+        <div style="font-weight:700">Go 1.24</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">pgx, zap</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px">
+        <div style="font-size:.8rem;color:var(--text-muted)">API</div>
+        <div style="font-weight:700">NestJS 11</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">BullMQ, JWT</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px">
+        <div style="font-size:.8rem;color:var(--text-muted)">UI</div>
+        <div style="font-weight:700">React 19</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">Vite 6, TanStack 5</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px">
+        <div style="font-size:.8rem;color:var(--text-muted)">Container</div>
+        <div style="font-weight:700">K3s + Cilium</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">Longhorn, CNPG</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px">
+        <div style="font-size:.8rem;color:var(--text-muted)">DB</div>
+        <div style="font-weight:700">PostgreSQL 16</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">CloudNative PG</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px">
+        <div style="font-size:.8rem;color:var(--text-muted)">Cache / Queue</div>
+        <div style="font-weight:700">Redis 7.4</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">BullMQ</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px">
+        <div style="font-size:.8rem;color:var(--text-muted)">Build</div>
+        <div style="font-weight:700">Kaniko</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">In-cluster, no Docker</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px">
+        <div style="font-size:.8rem;color:var(--text-muted)">Proxy</div>
+        <div style="font-weight:700">Caddy v2</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">DNS-01 certs</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px">
+        <div style="font-size:.8rem;color:var(--text-muted)">Logs</div>
+        <div style="font-weight:700">Loki 2.9 + Promtail</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">30-day retention</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px">
+        <div style="font-size:.8rem;color:var(--text-muted)">CI</div>
+        <div style="font-weight:700">GitHub Actions</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">Go 1.24, Node 24</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <div class="links">
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms &amp; Conditions</a>
+      <a href="https://github.com/arunishshekhar/harbr" target="_blank">GitHub</a>
+    </div>
+    <p>&copy; 2026 Harbr. Released under the MIT License.</p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({theme:'dark',themeVariables:{background:'#161b22',primaryColor:'#1f6feb',primaryTextColor:'#e6edf3',primaryBorderColor:'#30363d',lineColor:'#30363d',secondaryColor:'#1c2128'},flowchart:{htmlLabels:true,curve:'basis'},sequence:{showSequenceNumbers:true}});</script>
+</body>
+</html>

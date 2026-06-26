@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terms &amp; Conditions — Harbr</title>
+<meta name="description" content="Harbr Terms and Conditions">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <a href="/" class="logo"><span>Harbr</span></a>
+    <div class="links">
+      <a href="/">Home</a>
+      <a href="https://github.com/arunishshekhar/harbr" target="_blank">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<section>
+  <div class="container legal">
+    <h1>Terms &amp; Conditions</h1>
+    <p class="date">Last updated: June 26, 2026</p>
+
+    <h2>1. License</h2>
+    <p>Harbr is released under the <strong>MIT License</strong>. You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the software, subject to the following conditions:</p>
+    <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+
+    <h2>2. Disclaimer of Warranty</h2>
+    <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+
+    <h2>3. Use at Your Own Risk</h2>
+    <p>Harbr deploys containerized applications on your infrastructure and manages system-level resources including:</p>
+    <ul>
+      <li>K3s cluster configuration and node management</li>
+      <li>Container runtime and network policies</li>
+      <li>Persistent storage volumes</li>
+      <li>DNS records and TLS certificate provisioning</li>
+      <li>Reverse proxy and tunnel configuration</li>
+    </ul>
+    <p>Misconfiguration or software bugs could result in service disruption, data loss, or security exposure. You assume all risks associated with running Harbr on your infrastructure.</p>
+
+    <h2>4. Infrastructure Requirements</h2>
+    <p>Harbr is designed for use on hardware you own or control. You are responsible for:</p>
+    <ul>
+      <li>Ensuring your nodes meet the minimum requirements (4 GB RAM, 2 CPUs, 20 GB disk per node)</li>
+      <li>Securing your operating system and network</li>
+      <li>Maintaining backups of your PostgreSQL database and Longhorn volumes</li>
+      <li>Keeping your Cloudflare API tokens and other credentials secure</li>
+      <li>Complying with all applicable laws regarding the software you deploy</li>
+    </ul>
+
+    <h2>5. Third-Party Services</h2>
+    <p>Harbr may interact with third-party services at your direction:</p>
+    <ul>
+      <li><strong>GitHub</strong> — webhook integration requires a GitHub account and repository</li>
+      <li><strong>Cloudflare</strong> — Tunnel and DNS-01 access modes require a Cloudflare account and domain</li>
+      <li><strong>Docker Hub / external registries</strong> — if configured for image pushing or pulling</li>
+    </ul>
+    <p>You are responsible for compliance with the terms of service of any third-party services you connect to Harbr.</p>
+
+    <h2>6. Contributions</h2>
+    <p>Contributions to Harbr are welcome via pull requests. By contributing, you agree that your contributions will be licensed under the same MIT License.</p>
+
+    <h2>7. No Affiliation</h2>
+    <p>Harbr is not affiliated with, endorsed by, or sponsored by K3s, Cilium, Longhorn, Cloudflare, GitHub, or any other third-party project referenced in the documentation or code.</p>
+
+    <h2>8. Changes to Terms</h2>
+    <p>These terms may be updated as Harbr evolves. The latest version will always be available at this URL. Continued use of Harbr after changes constitutes acceptance of the updated terms.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="links">
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms &amp; Conditions</a>
+      <a href="https://github.com/arunishshekhar/harbr" target="_blank">GitHub</a>
+    </div>
+    <p>&copy; 2026 Harbr. Released under the MIT License.</p>
+  </div>
+</footer>
+
+</body>
+</html>
