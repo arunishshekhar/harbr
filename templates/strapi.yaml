@@ -1,0 +1,8 @@
+name: strapi
+description: Strapi headless CMS
+image: strapi/strapi:latest
+port: 1337
+healthcheck_path: /
+category: cms
+deploy_mode: standalone
+runtime_version: strapi/strapi:latest

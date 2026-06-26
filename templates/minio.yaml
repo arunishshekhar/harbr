@@ -1,0 +1,8 @@
+name: minio
+description: MinIO S3-compatible object storage
+image: minio/minio:RELEASE.2025-01-01T00-00-00Z
+port: 9001
+healthcheck_path: /
+category: storage
+deploy_mode: standalone
+runtime_version: minio/minio:RELEASE.2025-01-01T00-00-00Z

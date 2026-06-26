@@ -1,0 +1,10 @@
+name: seafile
+description: Seafile file sync platform
+image: seafileltd/seafile-mc:latest
+port: 80
+healthcheck_path: /
+category: storage
+deploy_mode: stack
+runtime_version: seafileltd/seafile-mc:latest
+stack_services:
+  - mysql8

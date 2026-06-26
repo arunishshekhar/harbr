@@ -1,0 +1,11 @@
+name: ollama-webui
+description: Ollama LLM server with Open WebUI
+image: ghcr.io/open-webui/open-webui:main
+port: 3000
+healthcheck_path: /
+category: ai-llm
+deploy_mode: stack
+gpu_optional: true
+runtime_version: ghcr.io/open-webui/open-webui:main
+stack_services:
+  - ollama

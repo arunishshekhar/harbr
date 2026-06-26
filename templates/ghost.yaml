@@ -1,0 +1,8 @@
+name: ghost
+description: Ghost publishing platform
+image: ghost:5-alpine
+port: 2368
+healthcheck_path: /
+category: cms
+deploy_mode: standalone
+runtime_version: ghost:5-alpine

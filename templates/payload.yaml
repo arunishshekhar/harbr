@@ -1,0 +1,8 @@
+name: payload
+description: Payload CMS
+image: node:24-alpine
+port: 3000
+healthcheck_path: /
+category: cms
+deploy_mode: standalone
+runtime_version: node:24-alpine

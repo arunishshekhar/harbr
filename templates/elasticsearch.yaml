@@ -1,0 +1,9 @@
+name: elasticsearch
+description: Elasticsearch search engine
+image: elasticsearch:8.13.0
+port: 9200
+healthcheck_path: /
+category: databases
+deploy_mode: standalone
+db_type: elasticsearch
+runtime_version: elasticsearch:8.13.0

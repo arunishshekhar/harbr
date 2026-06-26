@@ -1,0 +1,9 @@
+name: redis7
+description: Redis 7 cache/database
+image: redis:7.4-alpine
+port: 6379
+healthcheck_path: /
+category: databases
+deploy_mode: standalone
+db_type: redis
+runtime_version: redis:7.4-alpine

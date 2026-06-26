@@ -1,0 +1,8 @@
+name: nextcloud
+description: Nextcloud file sync and share
+image: nextcloud:28-apache
+port: 80
+healthcheck_path: /
+category: storage
+deploy_mode: standalone
+runtime_version: nextcloud:28-apache

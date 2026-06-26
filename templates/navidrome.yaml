@@ -1,0 +1,8 @@
+name: navidrome
+description: Navidrome music server
+image: deluan/navidrome:latest
+port: 4533
+healthcheck_path: /
+category: media
+deploy_mode: standalone
+runtime_version: deluan/navidrome:latest

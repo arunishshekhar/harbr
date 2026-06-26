@@ -1,0 +1,11 @@
+name: plausible
+description: Plausible web analytics
+image: plausible/analytics:latest
+port: 8000
+healthcheck_path: /
+category: analytics
+deploy_mode: stack
+runtime_version: plausible/analytics:latest
+stack_services:
+  - postgres16
+  - clickhouse

@@ -1,0 +1,8 @@
+name: authelia
+description: Authelia authentication server
+image: authelia/authelia:4
+port: 9091
+healthcheck_path: /
+category: security-auth
+deploy_mode: standalone
+runtime_version: authelia/authelia:4

@@ -1,0 +1,11 @@
+name: immich
+description: Immich photo management
+image: ghcr.io/immich-app/immich-server:latest
+port: 2283
+healthcheck_path: /
+category: media
+deploy_mode: stack
+runtime_version: ghcr.io/immich-app/immich-server:latest
+stack_services:
+  - redis7
+  - postgres16

@@ -1,0 +1,8 @@
+name: registry-ui
+description: Docker registry web UI
+image: joxit/docker-registry-ui:latest
+port: 80
+healthcheck_path: /
+category: dev-tools
+deploy_mode: standalone
+runtime_version: joxit/docker-registry-ui:latest

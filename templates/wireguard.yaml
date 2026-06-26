@@ -1,0 +1,8 @@
+name: wireguard
+description: WireGuard VPN server
+image: linuxserver/wireguard:latest
+port: 51820
+healthcheck_path: /
+category: vpn-network
+deploy_mode: standalone
+runtime_version: linuxserver/wireguard:latest

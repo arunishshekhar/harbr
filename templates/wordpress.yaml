@@ -1,0 +1,10 @@
+name: wordpress
+description: WordPress CMS with MySQL
+image: wordpress:latest
+port: 80
+healthcheck_path: /wp-login.php
+category: cms
+deploy_mode: stack
+runtime_version: wordpress:latest
+stack_services:
+  - mysql8

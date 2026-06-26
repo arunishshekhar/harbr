@@ -1,0 +1,10 @@
+name: woodpecker-ci
+description: Woodpecker CI/CD server
+image: woodpeckerci/woodpecker-server:latest
+port: 8000
+healthcheck_path: /
+category: dev-tools
+deploy_mode: stack
+runtime_version: woodpeckerci/woodpecker-server:latest
+stack_services:
+  - postgres16

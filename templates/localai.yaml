@@ -1,0 +1,9 @@
+name: localai
+description: LocalAI LLM inference server
+image: localai/localai:latest
+port: 8080
+healthcheck_path: /
+category: ai-llm
+deploy_mode: standalone
+gpu_optional: true
+runtime_version: localai/localai:latest

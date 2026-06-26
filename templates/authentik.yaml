@@ -1,0 +1,11 @@
+name: authentik
+description: Authentik identity provider
+image: ghcr.io/goauthentik/server:latest
+port: 9000
+healthcheck_path: /
+category: security-auth
+deploy_mode: stack
+runtime_version: ghcr.io/goauthentik/server:latest
+stack_services:
+  - postgres16
+  - redis7

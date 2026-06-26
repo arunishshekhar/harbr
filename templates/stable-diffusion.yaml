@@ -1,0 +1,9 @@
+name: stable-diffusion
+description: Stable Diffusion web UI
+image: universonic/stable-diffusion-webui:latest
+port: 7860
+healthcheck_path: /
+category: ai-llm
+deploy_mode: standalone
+gpu_optional: true
+runtime_version: universonic/stable-diffusion-webui:latest

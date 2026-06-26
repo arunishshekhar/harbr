@@ -1,0 +1,8 @@
+name: directus
+description: Directus headless CMS
+image: directus/directus:11
+port: 8055
+healthcheck_path: /
+category: cms
+deploy_mode: standalone
+runtime_version: directus/directus:11

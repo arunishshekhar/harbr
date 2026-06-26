@@ -1,0 +1,8 @@
+name: uptime-kuma
+description: Uptime Kuma monitoring dashboard
+image: louislam/uptime-kuma:1
+port: 3001
+healthcheck_path: /
+category: monitoring
+deploy_mode: standalone
+runtime_version: louislam/uptime-kuma:1

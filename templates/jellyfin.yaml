@@ -1,0 +1,8 @@
+name: jellyfin
+description: Jellyfin media server
+image: jellyfin/jellyfin:10
+port: 8096
+healthcheck_path: /
+category: media
+deploy_mode: standalone
+runtime_version: jellyfin/jellyfin:10

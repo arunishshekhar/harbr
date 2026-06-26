@@ -1,0 +1,9 @@
+name: mongodb7
+description: MongoDB 7 database
+image: mongo:7
+port: 27017
+healthcheck_path: /
+category: databases
+deploy_mode: standalone
+db_type: mongodb
+runtime_version: mongo:7

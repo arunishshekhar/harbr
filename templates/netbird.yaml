@@ -1,0 +1,8 @@
+name: netbird
+description: Netbird VPN management server
+image: netbirdio/management:latest
+port: 80
+healthcheck_path: /
+category: vpn-network
+deploy_mode: standalone
+runtime_version: netbirdio/management:latest

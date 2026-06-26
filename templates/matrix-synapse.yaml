@@ -1,0 +1,10 @@
+name: matrix-synapse
+description: Matrix Synapse homeserver
+image: matrixdotorg/synapse:latest
+port: 8008
+healthcheck_path: /health
+category: communication
+deploy_mode: stack
+runtime_version: matrixdotorg/synapse:latest
+stack_services:
+  - postgres16

@@ -1,0 +1,8 @@
+name: rails
+description: Ruby on Rails application
+image: ruby:3.3-slim
+port: 3000
+healthcheck_path: /health
+category: web-frameworks
+deploy_mode: standalone
+runtime_version: ruby:3.3-slim

@@ -1,0 +1,9 @@
+name: mysql8
+description: MySQL 8.0 database
+image: mysql:8.0
+port: 3306
+healthcheck_path: /
+category: databases
+deploy_mode: standalone
+db_type: mysql
+runtime_version: mysql:8.0

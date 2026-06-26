@@ -1,0 +1,9 @@
+name: stalwart
+description: Stalwart mail server (requires port 25)
+image: stalwartlabs/mail-server:latest
+port: 8080
+healthcheck_path: /
+category: email
+deploy_mode: standalone
+runtime_version: stalwartlabs/mail-server:latest
+warning: port25

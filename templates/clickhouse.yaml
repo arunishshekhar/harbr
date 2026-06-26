@@ -1,0 +1,9 @@
+name: clickhouse
+description: ClickHouse analytics database
+image: clickhouse/clickhouse-server:24
+port: 8123
+healthcheck_path: /
+category: databases
+deploy_mode: standalone
+db_type: clickhouse
+runtime_version: clickhouse/clickhouse-server:24

@@ -1,0 +1,10 @@
+name: grafana-prometheus
+description: Grafana with Prometheus monitoring
+image: grafana/grafana:latest
+port: 3000
+healthcheck_path: /api/health
+category: monitoring
+deploy_mode: stack
+runtime_version: grafana/grafana:latest
+stack_services:
+  - prometheus

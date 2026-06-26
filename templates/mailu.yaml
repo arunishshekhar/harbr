@@ -1,0 +1,12 @@
+name: mailu
+description: Mailu email server (requires port 25)
+image: mailu/admin:2024.06
+port: 80
+healthcheck_path: /
+category: email
+deploy_mode: stack
+runtime_version: mailu/admin:2024.06
+warning: port25
+stack_services:
+  - postgres16
+  - redis7

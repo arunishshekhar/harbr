@@ -1,0 +1,8 @@
+name: sveltekit
+description: SvelteKit application
+image: node:24-alpine
+port: 3000
+healthcheck_path: /
+category: web-frameworks
+deploy_mode: standalone
+runtime_version: node:24-alpine

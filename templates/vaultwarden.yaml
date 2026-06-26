@@ -1,0 +1,8 @@
+name: vaultwarden
+description: Vaultwarden password manager
+image: vaultwarden/server:latest
+port: 80
+healthcheck_path: /
+category: security-auth
+deploy_mode: standalone
+runtime_version: vaultwarden/server:latest

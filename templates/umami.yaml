@@ -1,0 +1,8 @@
+name: umami
+description: Umami web analytics
+image: ghcr.io/umami-software/umami:postgresql-latest
+port: 3000
+healthcheck_path: /
+category: analytics
+deploy_mode: standalone
+runtime_version: ghcr.io/umami-software/umami:postgresql-latest
