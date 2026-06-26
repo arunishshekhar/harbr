@@ -1,0 +1,6 @@
+*.go linguist-language=Go
+*.ts linguist-language=TypeScript
+*.tsx linguist-language=TypeScript
+*.yaml linguist-language=YAML
+*.sql linguist-language=SQL
+*.sh linguist-language=Shell
