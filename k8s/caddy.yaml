@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: caddy-data-pvc
+  namespace: harbr-system
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: caddy
+  namespace: harbr-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: caddy}
+  template:
+    metadata:
+      labels: {app: caddy}
+    spec:
+      containers:
+      - name: caddy
+        image: 100.64.0.1:30500/harbr/caddy-custom:2.8.x
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        - containerPort: 2019
+        env:
+        - name: CLOUDFLARE_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: cloudflare-dns-token
+              key: token
+        volumeMounts:
+        - name: caddy-data
+          mountPath: /root/.local/share/caddy
+        - name: caddy-config
+          mountPath: /etc/caddy
+        resources:
+          requests: {cpu: 100m, memory: 128Mi}
+          limits: {cpu: 500m, memory: 512Mi}
+      volumes:
+      - name: caddy-data
+        persistentVolumeClaim:
+          claimName: caddy-data-pvc
+      - name: caddy-config
+        configMap:
+          name: caddy-config

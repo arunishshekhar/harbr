@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-data-pvc
+  namespace: harbr-system
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  namespace: harbr-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: loki}
+  template:
+    metadata:
+      labels: {app: loki}
+    spec:
+      containers:
+      - name: loki
+        image: grafana/loki:2.9.8
+        args: ["-config.file=/etc/loki/config.yaml"]
+        ports:
+        - containerPort: 3100
+        volumeMounts:
+        - name: data
+          mountPath: /loki
+        - name: config
+          mountPath: /etc/loki
+        resources:
+          requests: {cpu: 100m, memory: 128Mi}
+          limits: {cpu: "1.0", memory: 512Mi}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: loki-data-pvc
+      - name: config
+        configMap:
+          name: loki-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-config
+  namespace: harbr-system
+data:
+  config.yaml: |
+    auth_enabled: false
+    server:
+      http_listen_port: 3100
+    ingester:
+      lifecycler:
+        ring:
+          kvstore: {store: inmemory}
+          replication_factor: 1
+    schema_config:
+      configs:
+        - from: 2024-01-01
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index: {prefix: index_, period: 24h}
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: /loki/boltdb-shipper-active
+        cache_location: /loki/boltdb-shipper-cache
+        shared_store: filesystem
+      filesystem:
+        directory: /loki/chunks
+    limits_config:
+      retention_period: 720h
+    compactor:
+      working_directory: /loki/compactor
+      shared_store: filesystem
+      retention_enabled: true

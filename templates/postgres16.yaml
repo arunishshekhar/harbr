@@ -1,0 +1,9 @@
+name: postgres16
+description: PostgreSQL 16 database
+image: postgres:16
+port: 5432
+healthcheck_path: /
+category: databases
+deploy_mode: standalone
+db_type: postgres
+runtime_version: postgres:16

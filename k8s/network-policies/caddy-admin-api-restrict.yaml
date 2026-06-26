@@ -1,0 +1,21 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: caddy-admin-api-restrict
+  namespace: harbr-system
+spec:
+  endpointSelector:
+    matchLabels: {app: caddy}
+  ingress:
+  - fromEndpoints:
+    - matchLabels: {app: harbr-api}
+    toPorts:
+    - ports:
+      - port: "2019"
+        protocol: TCP
+  - toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      - port: "443"
+        protocol: TCP

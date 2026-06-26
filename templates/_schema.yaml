@@ -1,0 +1,10 @@
+# Template Schema
+# All templates must include these fields:
+name: string           # Template name
+description: string    # Short description
+image: string          # Docker image
+port: integer          # Default container port
+healthcheck_path: string  # Health check endpoint
+category: string       # Category name
+deploy_mode: string    # "standalone" or "stack"
+runtime_version: string   # Default runtime

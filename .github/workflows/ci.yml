@@ -1,0 +1,73 @@
+name: CI
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  release:
+    types: [created]
+
+jobs:
+  test-daemon:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version: '1.24'}
+      - run: cd daemon && go test ./... -race -timeout 120s
+      - run: cd daemon && go vet ./...
+
+  test-api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: {POSTGRES_PASSWORD: test, POSTGRES_DB: harbr_test}
+        options: --health-cmd pg_isready --health-interval 5s
+      redis:
+        image: redis:7.4-alpine
+        options: --health-cmd "redis-cli ping" --health-interval 5s
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24', cache: 'npm', cache-dependency-path: api/package-lock.json}
+      - run: cd api && npm ci && npm test
+        env: {DB_HOST: localhost, DB_PASSWORD: test, REDIS_HOST: localhost}
+
+  test-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24', cache: 'npm', cache-dependency-path: ui/package-lock.json}
+      - run: cd ui && npm ci && npm run build
+
+  lint-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ludeeus/action-shellcheck@master
+        with: {scandir: './scripts'}
+
+  release:
+    if: github.event_name == 'release'
+    needs: [test-daemon, test-api, test-ui, lint-scripts]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version: '1.24'}
+      - run: |
+          TAG="${{ github.event.release.tag_name }}"
+          cd daemon
+          GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-X main.Version=${TAG}" \
+            -o ../dist/harbr-linux-amd64 ./cmd/harbr
+          GOOS=linux GOARCH=arm64 go build \
+            -ldflags="-X main.Version=${TAG}" \
+            -o ../dist/harbr-linux-arm64 ./cmd/harbr
+          sha256sum ../dist/harbr-linux-amd64 | awk '{print $1}' > ../dist/harbr-linux-amd64.sha256
+          sha256sum ../dist/harbr-linux-arm64 | awk '{print $1}' > ../dist/harbr-linux-arm64.sha256
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

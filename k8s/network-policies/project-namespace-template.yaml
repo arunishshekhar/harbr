@@ -1,0 +1,21 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: project-default-deny
+  namespace: NAMESPACE_PLACEHOLDER
+spec:
+  endpointSelector: {}
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: harbr-system
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: harbr-system
+  - toCIDR:
+    - 0.0.0.0/0
+    except:
+    - 10.42.0.0/16
+    - 10.43.0.0/16
+    - 100.64.0.0/10
