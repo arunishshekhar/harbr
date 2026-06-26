@@ -23,8 +23,8 @@ describe('ExternalProxyService', () => {
     await expect(service.validateProxyTarget('localhost', 11434)).resolves.toBeUndefined();
   });
 
-  it('allows localhost:8080', async () => {
-    await expect(service.validateProxyTarget('localhost', 8080)).resolves.toBeUndefined();
+  it('blocks port 8080', async () => {
+    await expect(service.validateProxyTarget('localhost', 8080)).rejects.toThrow('blocked');
   });
 
   it('blocks localhost:6443', async () => {

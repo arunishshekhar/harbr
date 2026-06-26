@@ -18,7 +18,7 @@ describe('AuthService', () => {
 
   it('login returns JWT with jti claim', async () => {
     const pool = { query: jest.fn().mockResolvedValue({ rows: [{
-      id: '1', username: 'admin', password_hash: '$2b$12$LJ3m4ys3Lk', role: 'admin', is_active: true,
+      id: '1', username: 'admin', password_hash: '$2b$12$uFUKCEESa4XDDb4cYC08heWSxXRI.n8NKn5jnzROvyAE1bXTpQd2.', role: 'admin', is_active: true,
     }]})};
     (service as any).pool = pool;
     const result = await service.login('admin', 'password');
@@ -34,7 +34,7 @@ describe('AuthService', () => {
 
   it('login throws 401 on inactive user', async () => {
     const pool = { query: jest.fn().mockResolvedValue({ rows: [{
-      id: '1', username: 'admin', password_hash: 'hash', role: 'admin', is_active: false,
+      id: '1', username: 'admin', password_hash: '$2b$12$uFUKCEESa4XDDb4cYC08heWSxXRI.n8NKn5jnzROvyAE1bXTpQd2.', role: 'admin', is_active: false,
     }]})};
     (service as any).pool = pool;
     await expect(service.login('admin', 'password')).rejects.toThrow('inactive');
