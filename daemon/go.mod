@@ -1,4 +1,4 @@
-module github.com/YOUR_USERNAME/harbr
+module github.com/arunishshekhar/harbr
 
 go 1.24
 

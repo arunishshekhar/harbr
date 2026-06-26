@@ -7,11 +7,11 @@ import (
 	"syscall"
 
 	"go.uber.org/zap"
-	"github.com/YOUR_USERNAME/harbr/internal/reconciler"
-	"github.com/YOUR_USERNAME/harbr/internal/health"
-	"github.com/YOUR_USERNAME/harbr/internal/tunnel"
-	"github.com/YOUR_USERNAME/harbr/internal/leader"
-	"github.com/YOUR_USERNAME/harbr/internal/dns_failover"
+	"github.com/arunishshekhar/harbr/internal/reconciler"
+	"github.com/arunishshekhar/harbr/internal/health"
+	"github.com/arunishshekhar/harbr/internal/tunnel"
+	"github.com/arunishshekhar/harbr/internal/leader"
+	"github.com/arunishshekhar/harbr/internal/dns_failover"
 )
 
 func main() {

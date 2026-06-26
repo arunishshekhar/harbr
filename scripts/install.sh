@@ -50,12 +50,12 @@ case "$(uname -m)" in
   *)       error "Unsupported architecture: $(uname -m)" ;;
 esac
 
-VERSION="${HARBR_VERSION:-$(curl -fsSL https://api.github.com/repos/YOUR_USERNAME/harbr/releases/latest | grep '"tag_name"' | cut -d'"' -f4)}"
+VERSION="${HARBR_VERSION:-$(curl -fsSL https://api.github.com/repos/arunishshekhar/harbr/releases/latest | grep '"tag_name"' | cut -d'"' -f4)}"
 
 info "Downloading Harbr ${VERSION} (${ARCH})..."
-curl -fsSL "https://github.com/YOUR_USERNAME/harbr/releases/download/${VERSION}/harbr-linux-${ARCH}" -o /tmp/harbr-new
+curl -fsSL "https://github.com/arunishshekhar/harbr/releases/download/${VERSION}/harbr-linux-${ARCH}" -o /tmp/harbr-new
 
-EXPECTED=$(curl -fsSL "https://github.com/YOUR_USERNAME/harbr/releases/download/${VERSION}/harbr-linux-${ARCH}.sha256")
+EXPECTED=$(curl -fsSL "https://github.com/arunishshekhar/harbr/releases/download/${VERSION}/harbr-linux-${ARCH}.sha256")
 ACTUAL=$(sha256sum /tmp/harbr-new | awk '{print $1}')
 [ "$ACTUAL" = "$EXPECTED" ] || error "SHA256 mismatch! Download may be corrupted."
 

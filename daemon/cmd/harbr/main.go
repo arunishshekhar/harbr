@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"github.com/YOUR_USERNAME/harbr/internal/tui"
+	"github.com/arunishshekhar/harbr/internal/tui"
 )
 
 var Version = "dev"
