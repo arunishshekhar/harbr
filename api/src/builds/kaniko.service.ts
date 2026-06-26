@@ -1,19 +1,20 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { Pool } from 'pg';
-import * as k8s from '@kubernetes/client-node';
+import { KubeConfig, KubernetesObjectApi, Log } from '@kubernetes/client-node';
+import { Writable } from 'stream';
 
 @Injectable()
 export class KanikoService {
-  private batchApi: k8s.BatchV1Api;
-  private coreApi: k8s.CoreV1Api;
+  private k8sApi: KubernetesObjectApi;
+  private logApi: Log;
 
   constructor(@Inject('PG_POOL') private pool: Pool) {
-    const kc = new k8s.KubeConfig();
+    const kc = new KubeConfig();
     process.env.KUBERNETES_SERVICE_HOST
       ? kc.loadFromCluster()
       : kc.loadFromDefault();
-    this.batchApi = kc.makeApiClient(k8s.BatchV1Api);
-    this.coreApi = kc.makeApiClient(k8s.CoreV1Api);
+    this.k8sApi = KubernetesObjectApi.makeApiClient(kc);
+    this.logApi = new Log(kc);
   }
 
   async executeKanikoJob(payload: any): Promise<void> {
@@ -117,12 +118,13 @@ export class KanikoService {
     };
 
     await this.ensureNamespace('harbr-builds');
+
     try {
-      await this.batchApi.createNamespacedJob({ namespace: 'harbr-builds', body: job });
+      await this.k8sApi.create(job);
     } catch (e: any) {
-      if (e.response?.body?.message?.includes('already exists')) {
-        await this.batchApi.deleteNamespacedJob({ name: jobName, namespace: 'harbr-builds' });
-        await this.batchApi.createNamespacedJob({ namespace: 'harbr-builds', body: job });
+      if (e.body?.code === 409 || e.statusCode === 409) {
+        await this.k8sApi.delete({ apiVersion: 'batch/v1', kind: 'Job', metadata: { name: jobName, namespace: 'harbr-builds' } });
+        await this.k8sApi.create(job);
       } else {
         throw e;
       }
@@ -153,32 +155,29 @@ export class KanikoService {
 
   private async ensureNamespace(ns: string): Promise<void> {
     try {
-      await this.coreApi.readNamespace({ name: ns });
+      await this.k8sApi.read({ apiVersion: 'v1', kind: 'Namespace', metadata: { name: ns } });
     } catch {
-      await this.coreApi.createNamespace({
-        body: { metadata: { name: ns, labels: { 'harbr.io/managed': 'true' } } },
-      });
+      try {
+        await this.k8sApi.create({
+          apiVersion: 'v1',
+          kind: 'Namespace',
+          metadata: { name: ns, labels: { 'harbr.io/managed': 'true' } },
+        });
+      } catch {}
     }
   }
 
   private async pollJob(jobName: string, buildId: string, timeoutMs = 600000): Promise<void> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
-      const { body: job } = await this.batchApi.readNamespacedJob({ name: jobName, namespace: 'harbr-builds' });
+      const job = await this.k8sApi.read({ apiVersion: 'batch/v1', kind: 'Job', metadata: { name: jobName, namespace: 'harbr-builds' } }) as any;
       if (job.status?.succeeded) return;
       if (job.status?.failed) {
-        const { body: pods } = await this.coreApi.listNamespacedPod({
-          namespace: 'harbr-builds',
-          labelSelector: `job-name=${jobName}`,
-        });
+        const podList = await this.k8sApi.list('v1', 'Pod', 'harbr-builds', undefined, undefined, undefined, `job-name=${jobName}`) as any;
         const logs: string[] = [];
-        for (const pod of pods.items) {
+        for (const pod of podList.items || []) {
           try {
-            const { body: log } = await this.coreApi.readNamespacedPodLog({
-              name: pod.metadata!.name!,
-              namespace: 'harbr-builds',
-              tailLines: 50,
-            });
+            const log = await this.getPodLog('harbr-builds', pod.metadata.name, 'kaniko');
             logs.push(log);
           } catch {}
         }
@@ -187,6 +186,25 @@ export class KanikoService {
       await new Promise(r => setTimeout(r, 5000));
     }
     throw new Error('Build timed out after 10 minutes');
+  }
+
+  private getPodLog(namespace: string, podName: string, containerName: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const stream = new Writable({
+        write(chunk: any, _encoding: string, callback: Function) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          callback();
+        },
+      });
+      this.logApi.log(namespace, podName, containerName, stream, { tailLines: 50 })
+        .then(controller => {
+          stream.on('finish', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+          stream.on('error', reject);
+          setTimeout(() => { controller.abort(); stream.end(); }, 10000);
+        })
+        .catch(reject);
+    });
   }
 
   private buildCloneCommand(url: string, branch: string, credType?: string): string {

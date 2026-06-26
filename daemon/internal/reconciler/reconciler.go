@@ -2,7 +2,6 @@ package reconciler
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"

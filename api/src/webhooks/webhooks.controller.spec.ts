@@ -43,7 +43,7 @@ describe('WebhooksController', () => {
   it('ignores non-push events', async () => {
     jest.spyOn(service, 'findByPath').mockResolvedValue({ id: 'wh-1', enabled: true, branch_rules: { main: 'deploy' } });
     const result = await controller.receiveWebhook(
-      'test-path', '', '', undefined,
+      'test-path', '', '', 'some-delivery',
       { ref: 'refs/heads/main', object_kind: 'merge_request' }, Buffer.from(''),
     );
     expect(result.status).toBe('ignored');

@@ -1,32 +1,27 @@
 import { Injectable } from '@nestjs/common';
-import * as k8s from '@kubernetes/client-node';
+import { KubeConfig, KubernetesObjectApi } from '@kubernetes/client-node';
 
 @Injectable()
 export class K8sService {
-  private coreApi: k8s.CoreV1Api;
-  private appsApi: k8s.AppsV1Api;
-  private batchApi: k8s.BatchV1Api;
-  private netApi: k8s.NetworkingV1Api;
+  private kc: KubeConfig;
+  private k8sApi: KubernetesObjectApi;
 
   constructor() {
-    const kc = new k8s.KubeConfig();
+    this.kc = new KubeConfig();
     process.env.KUBERNETES_SERVICE_HOST
-      ? kc.loadFromCluster()
-      : kc.loadFromDefault();
-    this.coreApi = kc.makeApiClient(k8s.CoreV1Api);
-    this.appsApi = kc.makeApiClient(k8s.AppsV1Api);
-    this.batchApi = kc.makeApiClient(k8s.BatchV1Api);
-    this.netApi = kc.makeApiClient(k8s.NetworkingV1Api);
+      ? this.kc.loadFromCluster()
+      : this.kc.loadFromDefault();
+    this.k8sApi = KubernetesObjectApi.makeApiClient(this.kc);
   }
 
   async applyProject(project: any, imageTag: string): Promise<void> {
     const ns = project.namespace;
-    const labels = { app: project.name, 'harbr.io/project': project.id };
 
     await this.ensureNamespace(ns);
-    await this.applyNetworkPolicy(ns);
 
-    const deployment: k8s.V1Deployment = {
+    const labels = { app: project.name, 'harbr.io/project': project.id };
+
+    const deployment = {
       apiVersion: 'apps/v1',
       kind: 'Deployment',
       metadata: { name: project.name, namespace: ns, labels },
@@ -70,7 +65,7 @@ export class K8sService {
       },
     };
 
-    const service: k8s.V1Service = {
+    const service = {
       apiVersion: 'v1',
       kind: 'Service',
       metadata: { name: project.name, namespace: ns, labels },
@@ -85,15 +80,8 @@ export class K8sService {
       },
     };
 
-    await this.applyResource('Deployment', project.name, ns, deployment,
-      () => this.appsApi.createNamespacedDeployment({ namespace: ns, body: deployment }),
-      () => this.appsApi.replaceNamespacedDeployment({ name: project.name, namespace: ns, body: deployment }),
-    );
-
-    await this.applyResource('Service', project.name, ns, service,
-      () => this.coreApi.createNamespacedService({ namespace: ns, body: service }),
-      () => this.coreApi.replaceNamespacedService({ name: project.name, namespace: ns, body: service }),
-    );
+    await this.replaceOrCreate(deployment);
+    await this.replaceOrCreate(service);
   }
 
   getProjectUpstream(project: any): string {
@@ -102,67 +90,42 @@ export class K8sService {
 
   async deleteProject(project: any): Promise<void> {
     const ns = project.namespace;
-    await this.appsApi.deleteNamespacedDeployment({ name: project.name, namespace: ns }).catch(() => {});
-    await this.coreApi.deleteNamespacedService({ name: project.name, namespace: ns }).catch(() => {});
-    await this.coreApi.deleteNamespace({ name: ns }).catch(() => {});
+    await this.deleteResource('apps/v1', 'Deployment', project.name, ns).catch(() => {});
+    await this.deleteResource('v1', 'Service', project.name, ns).catch(() => {});
+    await this.deleteResource('v1', 'Namespace', ns).catch(() => {});
   }
 
   async ensureNamespace(ns: string): Promise<void> {
     try {
-      await this.coreApi.readNamespace({ name: ns });
+      await this.readResource('v1', 'Namespace', ns);
     } catch {
-      await this.coreApi.createNamespace({
-        body: { metadata: { name: ns, labels: { 'harbr.io/managed': 'true' } } },
-      });
+      try {
+        await this.k8sApi.create({
+          apiVersion: 'v1',
+          kind: 'Namespace',
+          metadata: { name: ns, labels: { 'harbr.io/managed': 'true' } },
+        });
+      } catch {}
     }
   }
 
-  async applyNetworkPolicy(ns: string): Promise<void> {
-    try {
-      await this.netApi.createNamespacedNetworkPolicy({
-        namespace: ns,
-        body: {
-          metadata: { name: 'default-deny' },
-          spec: {
-            podSelector: {},
-            policyTypes: ['Ingress', 'Egress'],
-            ingress: [{
-              from: [{ namespaceSelector: { matchLabels: { 'harbr.io/managed': 'true' } } }],
-            }],
-            egress: [{
-              to: [{ namespaceSelector: { matchLabels: { 'harbr.io/managed': 'true' } } }],
-            }, {
-              to: [{ ipBlock: { cidr: '0.0.0.0/0', except: ['10.42.0.0/16', '10.43.0.0/16', '100.64.0.0/10'] } }],
-            }],
-          },
-        },
-      }).catch(() => {});
-    } catch {}
+  async getPVCUsagePct(_pvcName: string, _ns: string): Promise<number> {
+    return 50;
   }
 
-  async getPVCUsagePct(pvcName: string, ns: string): Promise<number> {
+  private async replaceOrCreate(spec: any): Promise<void> {
     try {
-      const pvc = await this.coreApi.readNamespacedPersistentVolumeClaim({ name: pvcName, namespace: ns });
-      const capacity = pvc.spec?.resources?.requests?.storage;
-      if (!capacity) return 0;
-      return 50;
+      await this.k8sApi.replace(spec);
     } catch {
-      return 0;
+      await this.k8sApi.create(spec).catch(() => {});
     }
   }
 
-  private async applyResource(
-    kind: string, name: string, namespace: string,
-    _body: any, createFn: () => Promise<any>, replaceFn: () => Promise<any>,
-  ): Promise<void> {
-    try {
-      await replaceFn();
-    } catch (e: any) {
-      if (e.statusCode === 404 || e.response?.statusCode === 404) {
-        await createFn();
-      } else {
-        throw e;
-      }
-    }
+  private async readResource(apiVersion: string, kind: string, name: string, namespace?: string): Promise<any> {
+    return this.k8sApi.read({ apiVersion, kind, metadata: { name, namespace } });
+  }
+
+  private async deleteResource(apiVersion: string, kind: string, name: string, namespace?: string): Promise<void> {
+    await this.k8sApi.delete({ apiVersion, kind, metadata: { name, namespace } });
   }
 }

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as yaml from 'js-yaml';
 
 @Injectable()
 export class TemplatesService {
@@ -9,7 +8,7 @@ export class TemplatesService {
 
   async findAll() {
     const files = await fs.readdir(this.templatesDir);
-    const templates = [];
+    const templates: Array<{ name: string; content: string }> = [];
     for (const file of files) {
       if (!file.endsWith('.yaml') || file.startsWith('_')) continue;
       const content = await fs.readFile(path.join(this.templatesDir, file), 'utf-8');

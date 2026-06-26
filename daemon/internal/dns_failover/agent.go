@@ -20,9 +20,13 @@ func New(logger *zap.Logger) *Agent {
 
 func (a *Agent) Start(ctx context.Context) {
 	if a.cfg != nil && a.cfg.AccessMode == "tunnel" {
-		a.logger.Info("skipping DNS failover agent: running in tunnel mode")
+		if a.logger != nil {
+			a.logger.Info("skipping DNS failover agent: running in tunnel mode")
+		}
 		return
 	}
-	a.logger.Info("DNS failover agent starting")
+	if a.logger != nil {
+		a.logger.Info("DNS failover agent starting")
+	}
 	<-ctx.Done()
 }

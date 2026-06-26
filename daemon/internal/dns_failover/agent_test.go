@@ -6,6 +6,6 @@ import (
 )
 
 func TestFailoverSkipsInTunnelMode(t *testing.T) {
-	a := &Agent{logger: nil, cfg: &Config{AccessMode: "tunnel"}}
+	a := &Agent{cfg: &Config{AccessMode: "tunnel"}}
 	a.Start(context.Background())
 }
