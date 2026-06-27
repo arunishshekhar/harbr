@@ -212,21 +212,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
-	case installProgressMsg:
-		m.installProgress = msg.percent
-		if msg.stepIndex >= 0 {
+	case installNextStepMsg:
+		if msg.stepIndex < len(m.installSteps) {
 			m.installStep = msg.stepIndex
-		}
-		m.installLog = append(m.installLog, msg.line)
-		if msg.done {
+			step := m.installSteps[msg.stepIndex]
+			m.installLog = append(m.installLog, fmt.Sprintf("▶ %s", step.name))
+			return m, doInstallStepCmd(msg.stepIndex, step)
+		} else {
 			m.installDone = true
 			m.step = StepDone
+			m.installLog = append(m.installLog, "✓ Installation complete")
+			return m, m.progress.SetPercent(1.0)
 		}
+
+	case installProgressMsg:
 		if msg.err != nil {
 			m.installErr = msg.err
+			m.installLog = append(m.installLog, msg.line)
 			m.step = StepDone
+			return m, nil
 		}
-		return m, m.progress.SetPercent(m.installProgress)
+		m.installLog = append(m.installLog, msg.line)
+		percent := float64(msg.stepIndex+1) / float64(len(m.installSteps))
+		m.installProgress = percent
+		
+		// Queue the next step
+		return m, tea.Batch(
+			m.progress.SetPercent(percent),
+			func() tea.Msg { return installNextStepMsg{stepIndex: msg.stepIndex + 1} },
+		)
 	}
 
 	if input, ok := m.inputs[m.step]; ok {
@@ -246,36 +260,40 @@ type installProgressMsg struct {
 	err       error
 }
 
+type installLogMsg struct {
+	line string
+}
+
 func performInstallCmd(m *model) tea.Cmd {
-	var cmds []tea.Cmd
-	for i, step := range m.installSteps {
-		i, step := i, step
-		n := len(m.installSteps)
-		cmds = append(cmds, func() tea.Msg {
-			return installProgressMsg{
-				percent:   float64(i) / float64(n),
-				stepIndex: i,
-				line:      fmt.Sprintf("▶ %s", step.name),
-			}
-		})
-		cmds = append(cmds, func() tea.Msg {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-			defer cancel()
-			if err := step.action(ctx); err != nil {
-				return installProgressMsg{
-					percent:   float64(i) / float64(n),
-					stepIndex: i,
-					line:      fmt.Sprintf("✗ %s: %v", step.name, err),
-					err:       err,
-				}
-			}
-			return nil
-		})
+	return func() tea.Msg {
+		if len(m.installSteps) > 0 {
+			return installNextStepMsg{stepIndex: 0}
+		}
+		return nil
 	}
-	cmds = append(cmds, func() tea.Msg {
-		return installProgressMsg{percent: 1.0, stepIndex: -1, line: "✓ Installation complete", done: true}
-	})
-	return tea.Sequence(cmds...)
+}
+
+type installNextStepMsg struct {
+	stepIndex int
+}
+
+func doInstallStepCmd(stepIndex int, step installStep) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		if err := step.action(ctx); err != nil {
+			return installProgressMsg{
+				stepIndex: stepIndex,
+				line:      fmt.Sprintf("✗ %s: %v", step.name, err),
+				err:       err,
+			}
+		}
+		return installProgressMsg{
+			stepIndex: stepIndex,
+			line:      fmt.Sprintf("✓ %s", step.name),
+			done:      false,
+		}
+	}
 }
 
 func (m model) advance() (tea.Model, tea.Cmd) {
@@ -373,7 +391,7 @@ func (m *model) buildInstallSteps() {
 				"set -euo pipefail; if systemctl is-active --quiet harbrd; then echo 'harbrd already running'; exit 0; fi; systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd",
 			)},
 			installStep{"Starting Harbr API + Panel", runScriptSafe(
-				"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl apply -f /etc/harbr/k8s/ --server-side",
+				"kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml apply -f /etc/harbr/k8s/ --server-side",
 			)},
 			installStep{"Creating admin user", m.createAdminUser},
 		)
@@ -384,21 +402,21 @@ func (m *model) buildInstallSteps() {
 			installStep{"Waiting for K3s readiness", m.waitForK3s},
 			installStep{"Installing Helm", installHelm},
 			installStep{"Installing Cilium CNI", runScriptSafe(
-				"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; set -euo pipefail; if helm list -n kube-system 2>/dev/null | grep -q cilium; then echo 'cilium already installed'; exit 0; fi; helm repo add cilium https://helm.cilium.io && helm repo update && helm upgrade --install cilium cilium/cilium --version 1.19.0 --namespace kube-system --set operator.replicas=1 --wait --timeout 5m",
+				"set -euo pipefail; if helm --kubeconfig=/etc/rancher/k3s/k3s.yaml list -n kube-system 2>/dev/null | grep -q cilium; then echo 'cilium already installed'; exit 0; fi; helm --kubeconfig=/etc/rancher/k3s/k3s.yaml repo add cilium https://helm.cilium.io && helm --kubeconfig=/etc/rancher/k3s/k3s.yaml repo update && helm --kubeconfig=/etc/rancher/k3s/k3s.yaml upgrade --install cilium cilium/cilium --version 1.19.0 --namespace kube-system --set operator.replicas=1 --wait --timeout 5m",
 			)},
 			installStep{"Installing Longhorn", runScriptSafe(
-				"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; set -euo pipefail; if helm list -n longhorn-system 2>/dev/null | grep -q longhorn; then echo 'longhorn already installed'; exit 0; fi; helm repo add longhorn https://charts.longhorn.io && helm repo update && helm upgrade --install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace --version 1.7.0 --wait --timeout 10m",
+				"set -euo pipefail; if helm --kubeconfig=/etc/rancher/k3s/k3s.yaml list -n longhorn-system 2>/dev/null | grep -q longhorn; then echo 'longhorn already installed'; exit 0; fi; helm --kubeconfig=/etc/rancher/k3s/k3s.yaml repo add longhorn https://charts.longhorn.io && helm --kubeconfig=/etc/rancher/k3s/k3s.yaml repo update && helm --kubeconfig=/etc/rancher/k3s/k3s.yaml upgrade --install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace --version 1.7.0 --wait --timeout 10m",
 			)},
 			installStep{"Deploying core services", runScriptSafe(
-				"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl apply -f /etc/harbr/k8s/redis.yaml && " +
-					"kubectl apply -f /etc/harbr/k8s/caddy.yaml && " +
-					"kubectl apply -f /etc/harbr/k8s/loki.yaml",
+				"kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml apply -f /etc/harbr/k8s/redis.yaml && " +
+					"kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml apply -f /etc/harbr/k8s/caddy.yaml && " +
+					"kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml apply -f /etc/harbr/k8s/loki.yaml",
 			)},
 			installStep{"Installing Harbr Daemon", runScriptSafe(
 				"set -euo pipefail; if systemctl is-active --quiet harbrd; then echo 'harbrd already running'; exit 0; fi; systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd",
 			)},
 			installStep{"Starting Harbr API + Panel", runScriptSafe(
-				"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl apply -f /etc/harbr/k8s/ --server-side",
+				"kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml apply -f /etc/harbr/k8s/ --server-side",
 			)},
 			installStep{"Configuring Cloudflare", m.configureCloudflare},
 			installStep{"Creating admin user", m.createAdminUser},
@@ -570,9 +588,9 @@ func (m *model) configureCloudflare(ctx context.Context) error {
 		return nil // no token = skip, valid for VPS mode
 	}
 	// Write the Cloudflare API token as a K8s secret used by Caddy + cert-manager
-	script := fmt.Sprintf(`export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl -n harbr-system create secret generic cloudflare-dns-token \
+	script := fmt.Sprintf(`kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml -n harbr-system create secret generic cloudflare-dns-token \
 		--from-literal=token=%s \
-		--dry-run=client -o yaml | kubectl apply -f -`, m.cloudflareToken)
+		--dry-run=client -o yaml | kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml apply -f -`, m.cloudflareToken)
 	if err := runScript(script)(ctx); err != nil {
 		return fmt.Errorf("cloudflare secret: %w", err)
 	}
@@ -747,13 +765,9 @@ func (m model) doneView() string {
 		}
 		b.WriteString("\n\n")
 		if len(m.installLog) > 0 {
-			b.WriteString(dimmedStyle.Render("Last log entries:"))
+			b.WriteString(dimmedStyle.Render("Log entries (Full Install Trace):"))
 			b.WriteString("\n")
-			start := 0
-			if len(m.installLog) > 3 {
-				start = len(m.installLog) - 3
-			}
-			for _, line := range m.installLog[start:] {
+			for _, line := range m.installLog {
 				b.WriteString(dimmedStyle.Render(line))
 				b.WriteString("\n")
 			}
@@ -784,7 +798,8 @@ func ifEmpty(s, fallback string) string {
 }
 
 func RunSetup() {
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	// Not using tea.WithAltScreen() means the terminal logs won't be cleared when TUI exits.
+	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Setup failed: %v\n", err)
 		os.Exit(1)
