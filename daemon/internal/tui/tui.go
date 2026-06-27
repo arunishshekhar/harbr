@@ -368,6 +368,7 @@ func (m *model) buildInstallSteps() {
 			installStep{"Installing K3s", runScriptSafe(
 				"set -euo pipefail; if command -v k3s &>/dev/null; then echo 'k3s already installed'; exit 0; fi; curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='--disable=traefik --write-kubeconfig-mode=644' sh -",
 			)},
+			installStep{"Waiting for K3s readiness", m.waitForK3s},
 			installStep{"Installing Harbr Daemon", runScriptSafe(
 				"set -euo pipefail; if systemctl is-active --quiet harbrd; then echo 'harbrd already running'; exit 0; fi; systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd",
 			)},
@@ -380,6 +381,7 @@ func (m *model) buildInstallSteps() {
 		m.installSteps = append(commonSteps,
 			installStep{"Setting up Postgres DB", m.setupPostgresDB},
 			installStep{"Installing K3s with external datastore", m.installK3sWithDSN},
+			installStep{"Waiting for K3s readiness", m.waitForK3s},
 			installStep{"Installing Helm", installHelm},
 			installStep{"Installing Cilium CNI", runScriptSafe(
 				"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; set -euo pipefail; if helm list -n kube-system 2>/dev/null | grep -q cilium; then echo 'cilium already installed'; exit 0; fi; helm repo add cilium https://helm.cilium.io && helm repo update && helm upgrade --install cilium cilium/cilium --version 1.19.0 --namespace kube-system --set operator.replicas=1 --wait --timeout 5m",
@@ -402,6 +404,30 @@ func (m *model) buildInstallSteps() {
 			installStep{"Creating admin user", m.createAdminUser},
 		)
 	}
+}
+
+// waitForK3s polls until the kubeconfig exists and the API is responsive.
+func (m *model) waitForK3s(ctx context.Context) error {
+	if os.Getenv("HARBR_DEV_MODE") != "" {
+		return nil
+	}
+	script := `
+set -euo pipefail
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+# Wait for kubeconfig to exist (up to 30s)
+for i in {1..15}; do
+  if [ -f "$KUBECONFIG" ]; then break; fi
+  sleep 2
+done
+# Wait for API to answer (up to 60s)
+for i in {1..30}; do
+  if kubectl get nodes &>/dev/null; then exit 0; fi
+  sleep 2
+done
+echo "K3s failed to become ready"
+exit 1
+`
+	return runScript(strings.TrimSpace(script))(ctx)
 }
 
 // installTailscale uses the official one-line installer which handles repo setup.
