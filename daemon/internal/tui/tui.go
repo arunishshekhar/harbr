@@ -372,7 +372,7 @@ func (m *model) buildInstallSteps() {
 				"set -euo pipefail; if systemctl is-active --quiet harbrd; then echo 'harbrd already running'; exit 0; fi; systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd",
 			)},
 			installStep{"Starting Harbr API + Panel", runScriptSafe(
-				"kubectl apply -f /etc/harbr/k8s/ --server-side",
+				"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl apply -f /etc/harbr/k8s/ --server-side",
 			)},
 			installStep{"Creating admin user", m.createAdminUser},
 		)
@@ -382,13 +382,13 @@ func (m *model) buildInstallSteps() {
 			installStep{"Installing K3s with external datastore", m.installK3sWithDSN},
 			installStep{"Installing Helm", installHelm},
 			installStep{"Installing Cilium CNI", runScriptSafe(
-				"set -euo pipefail; if helm list -n kube-system 2>/dev/null | grep -q cilium; then echo 'cilium already installed'; exit 0; fi; helm repo add cilium https://helm.cilium.io && helm repo update && helm upgrade --install cilium cilium/cilium --version 1.19.0 --namespace kube-system --set operator.replicas=1 --wait --timeout 5m",
+				"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; set -euo pipefail; if helm list -n kube-system 2>/dev/null | grep -q cilium; then echo 'cilium already installed'; exit 0; fi; helm repo add cilium https://helm.cilium.io && helm repo update && helm upgrade --install cilium cilium/cilium --version 1.19.0 --namespace kube-system --set operator.replicas=1 --wait --timeout 5m",
 			)},
 			installStep{"Installing Longhorn", runScriptSafe(
-				"set -euo pipefail; if helm list -n longhorn-system 2>/dev/null | grep -q longhorn; then echo 'longhorn already installed'; exit 0; fi; helm repo add longhorn https://charts.longhorn.io && helm repo update && helm upgrade --install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace --version 1.7.0 --wait --timeout 10m",
+				"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; set -euo pipefail; if helm list -n longhorn-system 2>/dev/null | grep -q longhorn; then echo 'longhorn already installed'; exit 0; fi; helm repo add longhorn https://charts.longhorn.io && helm repo update && helm upgrade --install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace --version 1.7.0 --wait --timeout 10m",
 			)},
 			installStep{"Deploying core services", runScriptSafe(
-				"kubectl apply -f /etc/harbr/k8s/redis.yaml && " +
+				"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl apply -f /etc/harbr/k8s/redis.yaml && " +
 					"kubectl apply -f /etc/harbr/k8s/caddy.yaml && " +
 					"kubectl apply -f /etc/harbr/k8s/loki.yaml",
 			)},
@@ -396,7 +396,7 @@ func (m *model) buildInstallSteps() {
 				"set -euo pipefail; if systemctl is-active --quiet harbrd; then echo 'harbrd already running'; exit 0; fi; systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd",
 			)},
 			installStep{"Starting Harbr API + Panel", runScriptSafe(
-				"kubectl apply -f /etc/harbr/k8s/ --server-side",
+				"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl apply -f /etc/harbr/k8s/ --server-side",
 			)},
 			installStep{"Configuring Cloudflare", m.configureCloudflare},
 			installStep{"Creating admin user", m.createAdminUser},
@@ -544,7 +544,7 @@ func (m *model) configureCloudflare(ctx context.Context) error {
 		return nil // no token = skip, valid for VPS mode
 	}
 	// Write the Cloudflare API token as a K8s secret used by Caddy + cert-manager
-	script := fmt.Sprintf(`kubectl -n harbr-system create secret generic cloudflare-dns-token \
+	script := fmt.Sprintf(`export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl -n harbr-system create secret generic cloudflare-dns-token \
 		--from-literal=token=%s \
 		--dry-run=client -o yaml | kubectl apply -f -`, m.cloudflareToken)
 	if err := runScript(script)(ctx); err != nil {
