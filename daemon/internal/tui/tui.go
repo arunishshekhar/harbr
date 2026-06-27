@@ -356,7 +356,7 @@ func (m model) advance() (tea.Model, tea.Cmd) {
 func (m *model) buildInstallSteps() {
 	commonSteps := []installStep{
 		{"Installing prerequisites", runScriptSafe(
-			"apt-get update -qq && apt-get install -y -qq curl wget gnupg2 apt-transport-https ca-certificates lsb-release",
+			"set -euo pipefail; if ! command -v curl &>/dev/null || ! command -v wget &>/dev/null || ! command -v gpg &>/dev/null || ! command -v lsb_release &>/dev/null; then apt-get update -qq && apt-get install -y -qq curl wget gnupg2 apt-transport-https ca-certificates lsb-release; else echo 'prerequisites already installed'; fi",
 		)},
 		{"Installing Tailscale", installTailscale},
 		{"Installing Postgres 16", installPostgres16},
@@ -366,10 +366,10 @@ func (m *model) buildInstallSteps() {
 		m.installSteps = append(commonSteps,
 			installStep{"Setting up Postgres DB", m.setupPostgresDB},
 			installStep{"Installing K3s", runScriptSafe(
-				"curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='--disable=traefik --write-kubeconfig-mode=644' sh -",
+				"set -euo pipefail; if command -v k3s &>/dev/null; then echo 'k3s already installed'; exit 0; fi; curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='--disable=traefik --write-kubeconfig-mode=644' sh -",
 			)},
 			installStep{"Installing Harbr Daemon", runScriptSafe(
-				"systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd",
+				"set -euo pipefail; if systemctl is-active --quiet harbrd; then echo 'harbrd already running'; exit 0; fi; systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd",
 			)},
 			installStep{"Starting Harbr API + Panel", runScriptSafe(
 				"kubectl apply -f /etc/harbr/k8s/ --server-side",
@@ -382,14 +382,10 @@ func (m *model) buildInstallSteps() {
 			installStep{"Installing K3s with external datastore", m.installK3sWithDSN},
 			installStep{"Installing Helm", installHelm},
 			installStep{"Installing Cilium CNI", runScriptSafe(
-				"helm repo add cilium https://helm.cilium.io && helm repo update && " +
-					"helm upgrade --install cilium cilium/cilium --version 1.19.0 " +
-					"--namespace kube-system --set operator.replicas=1 --wait --timeout 5m",
+				"set -euo pipefail; if helm list -n kube-system 2>/dev/null | grep -q cilium; then echo 'cilium already installed'; exit 0; fi; helm repo add cilium https://helm.cilium.io && helm repo update && helm upgrade --install cilium cilium/cilium --version 1.19.0 --namespace kube-system --set operator.replicas=1 --wait --timeout 5m",
 			)},
 			installStep{"Installing Longhorn", runScriptSafe(
-				"helm repo add longhorn https://charts.longhorn.io && helm repo update && " +
-					"helm upgrade --install longhorn longhorn/longhorn " +
-					"--namespace longhorn-system --create-namespace --version 1.7.0 --wait --timeout 10m",
+				"set -euo pipefail; if helm list -n longhorn-system 2>/dev/null | grep -q longhorn; then echo 'longhorn already installed'; exit 0; fi; helm repo add longhorn https://charts.longhorn.io && helm repo update && helm upgrade --install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace --version 1.7.0 --wait --timeout 10m",
 			)},
 			installStep{"Deploying core services", runScriptSafe(
 				"kubectl apply -f /etc/harbr/k8s/redis.yaml && " +
@@ -397,7 +393,7 @@ func (m *model) buildInstallSteps() {
 					"kubectl apply -f /etc/harbr/k8s/loki.yaml",
 			)},
 			installStep{"Installing Harbr Daemon", runScriptSafe(
-				"systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd",
+				"set -euo pipefail; if systemctl is-active --quiet harbrd; then echo 'harbrd already running'; exit 0; fi; systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd",
 			)},
 			installStep{"Starting Harbr API + Panel", runScriptSafe(
 				"kubectl apply -f /etc/harbr/k8s/ --server-side",
@@ -524,6 +520,10 @@ func (m *model) installK3sWithDSN(ctx context.Context) error {
 	dsn := fmt.Sprintf("postgres://harbr:%s@127.0.0.1:5432/harbr?sslmode=disable", password)
 	script := fmt.Sprintf(`
 set -euo pipefail
+if command -v k3s &>/dev/null; then
+  echo "k3s already installed"
+  exit 0
+fi
 curl -sfL https://get.k3s.io | \
   INSTALL_K3S_EXEC='server \
     --datastore-endpoint="%s" \
