@@ -122,6 +122,7 @@ func initialModel() model {
 	for _, s := range []Step{StepNodeName, StepDomain, StepCloudflareToken, StepAdminUser, StepAdminPassword} {
 		ti := textinput.New()
 		ti.Placeholder = getPlaceholder(s)
+		ti.PromptStyle = lipgloss.NewStyle().Foreground(accentColor)
 		ti.Width = 40
 		ti.CharLimit = 100
 		if s == StepAdminPassword {
@@ -298,6 +299,11 @@ func (m model) advance() (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case StepDomain:
+		if m.setupPath == PathHomeServer && m.inputs[StepDomain].Value() == "" {
+			m.err = fmt.Errorf("domain is required for Home Server mode")
+			return m, nil
+		}
+		m.err = nil
 		m.domain = m.inputs[StepDomain].Value()
 		m.step = StepCloudflareToken
 		cmd := m.inputs[StepCloudflareToken].Focus()
@@ -451,6 +457,9 @@ func (m model) inputView() string {
 		title = "Node Name"
 	case StepDomain:
 		title = "Domain Name"
+		if m.setupPath == PathVPS {
+			title = "Domain Name (optional — press Enter to skip)"
+		}
 	case StepCloudflareToken:
 		title = "Cloudflare API Token"
 	case StepAdminUser:
@@ -505,8 +514,32 @@ func (m model) doneView() string {
 	if m.installErr != nil {
 		b.WriteString(errorStyle.Render("✗ Installation Failed"))
 		b.WriteString("\n\n")
-		b.WriteString(errorStyle.Render(fmt.Sprintf("%v", m.installErr)))
+		failedStep := ""
+		if m.installStep < len(m.installSteps) {
+			failedStep = m.installSteps[m.installStep].name
+		}
+		if failedStep != "" {
+			b.WriteString(boxStyle.Render(
+				errorStyle.Render(fmt.Sprintf("Step: %s", failedStep)) + "\n\n" +
+					fmt.Sprintf("Error: %v", m.installErr)))
+		} else {
+			b.WriteString(boxStyle.Render(fmt.Sprintf("%v", m.installErr)))
+		}
 		b.WriteString("\n\n")
+		if len(m.installLog) > 0 {
+			b.WriteString(dimmedStyle.Render("Last log entries:"))
+			b.WriteString("\n")
+			start := 0
+			if len(m.installLog) > 3 {
+				start = len(m.installLog) - 3
+			}
+			for _, line := range m.installLog[start:] {
+				b.WriteString(dimmedStyle.Render(line))
+				b.WriteString("\n")
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString("Check the system logs above for details. Press Enter or q to exit.")
 	} else {
 		b.WriteString(okStyle.Render("✓ Installation Complete"))
 		b.WriteString("\n\n")
