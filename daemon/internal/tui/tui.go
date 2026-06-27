@@ -356,23 +356,23 @@ func (m model) advance() (tea.Model, tea.Cmd) {
 func (m *model) buildInstallSteps() {
 	if m.setupPath == PathQuickStart {
 		m.installSteps = []installStep{
-			{"Installing Tailscale", runScript("apt-get install -y tailscale")},
-			{"Installing Postgres 16", runScript("apt-get install -y postgresql-16")},
-			{"Installing K3s", runScript("curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='--disable=traefik --write-kubeconfig-mode=644' sh -")},
-			{"Installing Harbr Daemon", runScript("systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd")},
-			{"Starting Harbr API + Panel", runScript("kubectl apply -f /etc/harbr/k8s/")},
+			{"Installing Tailscale", runScriptSafe("apt-get install -y tailscale")},
+			{"Installing Postgres 16", runScriptSafe("apt-get install -y postgresql-16")},
+			{"Installing K3s", runScriptSafe("curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='--disable=traefik --write-kubeconfig-mode=644' sh -")},
+			{"Installing Harbr Daemon", runScriptSafe("systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd")},
+			{"Starting Harbr API + Panel", runScriptSafe("kubectl apply -f /etc/harbr/k8s/")},
 			{"Creating admin user", m.createAdminUser},
 		}
 	} else {
 		m.installSteps = []installStep{
-			{"Installing Tailscale", runScript("apt-get install -y tailscale")},
-			{"Installing Postgres 16", runScript("apt-get install -y postgresql-16")},
+			{"Installing Tailscale", runScriptSafe("apt-get install -y tailscale")},
+			{"Installing Postgres 16", runScriptSafe("apt-get install -y postgresql-16")},
 			{"Installing K3s with external datastore", m.installK3sWithDSN},
-			{"Installing Cilium CNI", runScript("helm repo add cilium https://helm.cilium.io && helm upgrade --install cilium cilium/cilium --version 1.19.0 --namespace kube-system --set operator.replicas=1")},
-			{"Installing Longhorn", runScript("helm repo add longhorn https://charts.longhorn.io && helm upgrade --install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace --version 1.7.0")},
-			{"Deploying Registry", runScript("kubectl apply -f /etc/harbr/k8s/redis.yaml && kubectl apply -f /etc/harbr/k8s/caddy.yaml")},
-			{"Installing Harbr Daemon", runScript("systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd")},
-			{"Starting Harbr API + Panel", runScript("kubectl apply -f /etc/harbr/k8s/")},
+			{"Installing Cilium CNI", runScriptSafe("helm repo add cilium https://helm.cilium.io && helm upgrade --install cilium cilium/cilium --version 1.19.0 --namespace kube-system --set operator.replicas=1")},
+			{"Installing Longhorn", runScriptSafe("helm repo add longhorn https://charts.longhorn.io && helm upgrade --install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace --version 1.7.0")},
+			{"Deploying Registry", runScriptSafe("kubectl apply -f /etc/harbr/k8s/redis.yaml && kubectl apply -f /etc/harbr/k8s/caddy.yaml")},
+			{"Installing Harbr Daemon", runScriptSafe("systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd")},
+			{"Starting Harbr API + Panel", runScriptSafe("kubectl apply -f /etc/harbr/k8s/")},
 			{"Configuring Cloudflare", m.configureCloudflare},
 			{"Creating admin user", m.createAdminUser},
 		}
@@ -390,7 +390,19 @@ func runScript(script string) func(ctx context.Context) error {
 	}
 }
 
+func runScriptSafe(script string) func(ctx context.Context) error {
+	if os.Getenv("HARBR_DEV_MODE") != "" {
+		return func(ctx context.Context) error {
+			return nil
+		}
+	}
+	return runScript(script)
+}
+
 func (m *model) installK3sWithDSN(ctx context.Context) error {
+	if os.Getenv("HARBR_DEV_MODE") != "" {
+		return nil
+	}
 	dsn := fmt.Sprintf("postgres://harbr:harbr@localhost:5432/harbr?sslmode=disable")
 	script := fmt.Sprintf(`curl -sfL https://get.k3s.io | \
 		INSTALL_K3S_EXEC='server \
