@@ -214,6 +214,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case installProgressMsg:
 		m.installProgress = msg.percent
+		if msg.stepIndex >= 0 {
+			m.installStep = msg.stepIndex
+		}
 		m.installLog = append(m.installLog, msg.line)
 		if msg.done {
 			m.installDone = true
@@ -236,35 +239,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 type installProgressMsg struct {
-	percent float64
-	line    string
-	done    bool
-	err     error
+	percent   float64
+	stepIndex int
+	line      string
+	done      bool
+	err       error
 }
 
 func performInstallCmd(m *model) tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-		defer cancel()
-
-		for i, step := range m.installSteps {
-			m.installStep = i
-			percent := float64(i) / float64(len(m.installSteps))
+	var cmds []tea.Cmd
+	for i, step := range m.installSteps {
+		i, step := i, step
+		n := len(m.installSteps)
+		cmds = append(cmds, func() tea.Msg {
+			return installProgressMsg{
+				percent:   float64(i) / float64(n),
+				stepIndex: i,
+				line:      fmt.Sprintf("▶ %s", step.name),
+			}
+		})
+		cmds = append(cmds, func() tea.Msg {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+			defer cancel()
 			if err := step.action(ctx); err != nil {
 				return installProgressMsg{
-					percent: percent,
-					line:    fmt.Sprintf("✗ %s: %v", step.name, err),
-					err:     err,
+					percent:   float64(i) / float64(n),
+					stepIndex: i,
+					line:      fmt.Sprintf("✗ %s: %v", step.name, err),
+					err:       err,
 				}
 			}
-		}
-
-		return installProgressMsg{
-			percent: 1.0,
-			line:    "✓ Installation complete",
-			done:    true,
-		}
+			return nil
+		})
 	}
+	cmds = append(cmds, func() tea.Msg {
+		return installProgressMsg{percent: 1.0, stepIndex: -1, line: "✓ Installation complete", done: true}
+	})
+	return tea.Sequence(cmds...)
 }
 
 func (m model) advance() (tea.Model, tea.Cmd) {
@@ -371,9 +382,11 @@ func (m *model) buildInstallSteps() {
 func runScript(script string) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
 		cmd := exec.CommandContext(ctx, "bash", "-c", script)
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-		return cmd.Run()
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%s: %s", err, strings.TrimSpace(string(output)))
+		}
+		return nil
 	}
 }
 
@@ -498,7 +511,15 @@ func (m model) installingView() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Installing Harbr"))
 	b.WriteString("\n\n")
-	b.WriteString(fmt.Sprintf("%s %s\n", m.spinner.View(), m.installSteps[m.installStep].name))
+	b.WriteString(m.spinner.View())
+	stepName := ""
+	if m.installStep >= 0 && m.installStep < len(m.installSteps) {
+		stepName = m.installSteps[m.installStep].name
+	}
+	if stepName != "" {
+		b.WriteString(" ")
+		b.WriteString(stepName)
+	}
 	b.WriteString("\n")
 	b.WriteString(m.progress.ViewAs(m.installProgress))
 	b.WriteString("\n\n")
