@@ -573,13 +573,7 @@ if command -v k3s &>/dev/null; then
   echo "k3s already installed"
   exit 0
 fi
-curl -sfL https://get.k3s.io | \
-  INSTALL_K3S_EXEC='server \
-    --datastore-endpoint="%s" \
-    --disable=traefik \
-    --flannel-backend=none \
-    --disable-network-policy \
-    --write-kubeconfig-mode=644' sh -
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='server --datastore-endpoint="%s" --disable=traefik --flannel-backend=none --disable-network-policy --write-kubeconfig-mode=644' sh -
 `, dsn)
 	return runScript(strings.TrimSpace(script))(ctx)
 }
