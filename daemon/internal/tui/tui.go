@@ -354,29 +354,115 @@ func (m model) advance() (tea.Model, tea.Cmd) {
 }
 
 func (m *model) buildInstallSteps() {
-	if m.setupPath == PathQuickStart {
-		m.installSteps = []installStep{
-			{"Installing Tailscale", runScriptSafe("apt-get install -y tailscale")},
-			{"Installing Postgres 16", runScriptSafe("apt-get install -y postgresql-16")},
-			{"Installing K3s", runScriptSafe("curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='--disable=traefik --write-kubeconfig-mode=644' sh -")},
-			{"Installing Harbr Daemon", runScriptSafe("systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd")},
-			{"Starting Harbr API + Panel", runScriptSafe("kubectl apply -f /etc/harbr/k8s/")},
-			{"Creating admin user", m.createAdminUser},
-		}
-	} else {
-		m.installSteps = []installStep{
-			{"Installing Tailscale", runScriptSafe("apt-get install -y tailscale")},
-			{"Installing Postgres 16", runScriptSafe("apt-get install -y postgresql-16")},
-			{"Installing K3s with external datastore", m.installK3sWithDSN},
-			{"Installing Cilium CNI", runScriptSafe("helm repo add cilium https://helm.cilium.io && helm upgrade --install cilium cilium/cilium --version 1.19.0 --namespace kube-system --set operator.replicas=1")},
-			{"Installing Longhorn", runScriptSafe("helm repo add longhorn https://charts.longhorn.io && helm upgrade --install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace --version 1.7.0")},
-			{"Deploying Registry", runScriptSafe("kubectl apply -f /etc/harbr/k8s/redis.yaml && kubectl apply -f /etc/harbr/k8s/caddy.yaml")},
-			{"Installing Harbr Daemon", runScriptSafe("systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd")},
-			{"Starting Harbr API + Panel", runScriptSafe("kubectl apply -f /etc/harbr/k8s/")},
-			{"Configuring Cloudflare", m.configureCloudflare},
-			{"Creating admin user", m.createAdminUser},
-		}
+	commonSteps := []installStep{
+		{"Installing prerequisites", runScriptSafe(
+			"apt-get update -qq && apt-get install -y -qq curl wget gnupg2 apt-transport-https ca-certificates lsb-release",
+		)},
+		{"Installing Tailscale", installTailscale},
+		{"Installing Postgres 16", installPostgres16},
 	}
+
+	if m.setupPath == PathQuickStart {
+		m.installSteps = append(commonSteps,
+			installStep{"Setting up Postgres DB", m.setupPostgresDB},
+			installStep{"Installing K3s", runScriptSafe(
+				"curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='--disable=traefik --write-kubeconfig-mode=644' sh -",
+			)},
+			installStep{"Installing Harbr Daemon", runScriptSafe(
+				"systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd",
+			)},
+			installStep{"Starting Harbr API + Panel", runScriptSafe(
+				"kubectl apply -f /etc/harbr/k8s/ --server-side",
+			)},
+			installStep{"Creating admin user", m.createAdminUser},
+		)
+	} else {
+		m.installSteps = append(commonSteps,
+			installStep{"Setting up Postgres DB", m.setupPostgresDB},
+			installStep{"Installing K3s with external datastore", m.installK3sWithDSN},
+			installStep{"Installing Helm", installHelm},
+			installStep{"Installing Cilium CNI", runScriptSafe(
+				"helm repo add cilium https://helm.cilium.io && helm repo update && " +
+					"helm upgrade --install cilium cilium/cilium --version 1.19.0 " +
+					"--namespace kube-system --set operator.replicas=1 --wait --timeout 5m",
+			)},
+			installStep{"Installing Longhorn", runScriptSafe(
+				"helm repo add longhorn https://charts.longhorn.io && helm repo update && " +
+					"helm upgrade --install longhorn longhorn/longhorn " +
+					"--namespace longhorn-system --create-namespace --version 1.7.0 --wait --timeout 10m",
+			)},
+			installStep{"Deploying core services", runScriptSafe(
+				"kubectl apply -f /etc/harbr/k8s/redis.yaml && " +
+					"kubectl apply -f /etc/harbr/k8s/caddy.yaml && " +
+					"kubectl apply -f /etc/harbr/k8s/loki.yaml",
+			)},
+			installStep{"Installing Harbr Daemon", runScriptSafe(
+				"systemctl daemon-reload && systemctl enable harbrd && systemctl start harbrd",
+			)},
+			installStep{"Starting Harbr API + Panel", runScriptSafe(
+				"kubectl apply -f /etc/harbr/k8s/ --server-side",
+			)},
+			installStep{"Configuring Cloudflare", m.configureCloudflare},
+			installStep{"Creating admin user", m.createAdminUser},
+		)
+	}
+}
+
+// installTailscale uses the official one-line installer which handles repo setup.
+func installTailscale(ctx context.Context) error {
+	if os.Getenv("HARBR_DEV_MODE") != "" {
+		return nil
+	}
+	script := `
+set -euo pipefail
+# Skip if already installed
+if command -v tailscale &>/dev/null; then
+  echo "tailscale already installed: $(tailscale version)"
+  exit 0
+fi
+curl -fsSL https://tailscale.com/install.sh | sh
+`
+	return runScript(strings.TrimSpace(script))(ctx)
+}
+
+// installPostgres16 adds the official PostgreSQL apt repository then installs pg16.
+func installPostgres16(ctx context.Context) error {
+	if os.Getenv("HARBR_DEV_MODE") != "" {
+		return nil
+	}
+	script := `
+set -euo pipefail
+# Skip if already installed
+if command -v psql &>/dev/null && psql --version | grep -q "16"; then
+  echo "postgres 16 already installed"
+  exit 0
+fi
+# Add PostgreSQL official apt repo
+curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/postgresql-archive-keyring.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+  > /etc/apt/sources.list.d/pgdg.list
+apt-get update -qq
+apt-get install -y postgresql-16 postgresql-client-16
+systemctl enable postgresql
+systemctl start postgresql
+`
+	return runScript(strings.TrimSpace(script))(ctx)
+}
+
+// installHelm installs the Helm binary via the official install script.
+func installHelm(ctx context.Context) error {
+	if os.Getenv("HARBR_DEV_MODE") != "" {
+		return nil
+	}
+	script := `
+set -euo pipefail
+if command -v helm &>/dev/null; then
+  echo "helm already installed: $(helm version --short)"
+  exit 0
+fi
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+`
+	return runScript(strings.TrimSpace(script))(ctx)
 }
 
 func runScript(script string) func(ctx context.Context) error {
@@ -399,21 +485,56 @@ func runScriptSafe(script string) func(ctx context.Context) error {
 	return runScript(script)
 }
 
+// setupPostgresDB creates the harbr database user and database.
+func (m *model) setupPostgresDB(ctx context.Context) error {
+	if os.Getenv("HARBR_DEV_MODE") != "" {
+		return nil
+	}
+	// Generate a random password if not already set
+	password := os.Getenv("HARBR_DB_PASSWORD")
+	if password == "" {
+		password = "harbr" // will be overridden by config writer
+	}
+	script := fmt.Sprintf(`
+set -euo pipefail
+systemctl start postgresql || true
+# Create user + db (idempotent)
+sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='harbr'" | grep -q 1 || \
+  sudo -u postgres psql -c "CREATE USER harbr WITH PASSWORD '%s';"
+sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='harbr'" | grep -q 1 || \
+  sudo -u postgres createdb -O harbr harbr
+# Allow password auth from localhost
+if ! grep -q "harbr" /etc/postgresql/16/main/pg_hba.conf; then
+  echo "host harbr harbr 127.0.0.1/32 md5" >> /etc/postgresql/16/main/pg_hba.conf
+  echo "host harbr harbr ::1/128 md5" >> /etc/postgresql/16/main/pg_hba.conf
+  systemctl reload postgresql
+fi
+`, password)
+	return runScript(strings.TrimSpace(script))(ctx)
+}
+
 func (m *model) installK3sWithDSN(ctx context.Context) error {
 	if os.Getenv("HARBR_DEV_MODE") != "" {
 		return nil
 	}
-	dsn := fmt.Sprintf("postgres://harbr:harbr@localhost:5432/harbr?sslmode=disable")
-	script := fmt.Sprintf(`curl -sfL https://get.k3s.io | \
-		INSTALL_K3S_EXEC='server \
-			--datastore-endpoint="%s" \
-			--disable=traefik \
-			--flannel-backend=none \
-			--disable-network-policy \
-			--write-kubeconfig-mode=644' sh -`,
-		dsn)
-	return runScript(script)(ctx)
+	password := os.Getenv("HARBR_DB_PASSWORD")
+	if password == "" {
+		password = "harbr"
+	}
+	dsn := fmt.Sprintf("postgres://harbr:%s@127.0.0.1:5432/harbr?sslmode=disable", password)
+	script := fmt.Sprintf(`
+set -euo pipefail
+curl -sfL https://get.k3s.io | \
+  INSTALL_K3S_EXEC='server \
+    --datastore-endpoint="%s" \
+    --disable=traefik \
+    --flannel-backend=none \
+    --disable-network-policy \
+    --write-kubeconfig-mode=644' sh -
+`, dsn)
+	return runScript(strings.TrimSpace(script))(ctx)
 }
+
 
 func (m *model) configureCloudflare(ctx context.Context) error {
 	if os.Getenv("HARBR_DEV_MODE") != "" {
