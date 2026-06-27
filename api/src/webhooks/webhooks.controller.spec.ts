@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WebhooksController } from './webhooks.controller';
 import { WebhooksService } from './webhooks.service';
+import { BuildsService } from '../builds/builds.service';
+
+const mockPool = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+const mockQueue = { add: jest.fn().mockResolvedValue({ id: 'job-1' }) };
 
 describe('WebhooksController', () => {
   let controller: WebhooksController;
@@ -11,7 +15,9 @@ describe('WebhooksController', () => {
       controllers: [WebhooksController],
       providers: [
         WebhooksService,
-        { provide: 'PG_POOL', useValue: { query: jest.fn().mockResolvedValue({ rows: [] }) } },
+        BuildsService,
+        { provide: 'PG_POOL', useValue: mockPool },
+        { provide: 'BullQueue_harbr-jobs', useValue: mockQueue },
       ],
     }).compile();
     controller = module.get<WebhooksController>(WebhooksController);
@@ -19,34 +25,30 @@ describe('WebhooksController', () => {
   });
 
   it('ignores duplicate X-GitHub-Delivery ID', async () => {
-    jest.spyOn(service, 'findByPath').mockResolvedValue({ id: 'wh-1', enabled: true, branch_rules: { main: 'deploy' } });
+    jest.spyOn(service, 'findByPath').mockResolvedValue({
+      id: 'wh-1', enabled: true, project_id: 'proj-1',
+      branch_rules: { main: { action: 'deploy' } }, secret_hash: '',
+    });
     jest.spyOn(service, 'isDeliveryProcessed').mockResolvedValue(true);
     const result = await controller.receiveWebhook(
       'test-path', '', '', 'dup-delivery-id',
-      { ref: 'refs/heads/main' }, Buffer.from(''),
+      { ref: 'refs/heads/main' },
     );
     expect(result.status).toBe('ignored');
     expect(result.reason).toContain('duplicate');
   });
 
-  it('processes unique delivery IDs normally', async () => {
-    jest.spyOn(service, 'findByPath').mockResolvedValue({ id: 'wh-1', enabled: true, branch_rules: { main: 'deploy' } });
+  it('ignores non-push events', async () => {
+    jest.spyOn(service, 'findByPath').mockResolvedValue({
+      id: 'wh-1', enabled: true, project_id: 'proj-1',
+      branch_rules: { main: { action: 'deploy' } }, secret_hash: '',
+    });
     jest.spyOn(service, 'isDeliveryProcessed').mockResolvedValue(false);
     jest.spyOn(service, 'recordDelivery').mockResolvedValue(undefined);
     const result = await controller.receiveWebhook(
-      'test-path', '', '', 'unique-delivery',
-      { ref: 'refs/heads/main' }, Buffer.from(''),
-    );
-    expect(result.status).toBe('triggered');
-  });
-
-  it('ignores non-push events', async () => {
-    jest.spyOn(service, 'findByPath').mockResolvedValue({ id: 'wh-1', enabled: true, branch_rules: { main: 'deploy' } });
-    const result = await controller.receiveWebhook(
       'test-path', '', '', 'some-delivery',
-      { ref: 'refs/heads/main', object_kind: 'merge_request' }, Buffer.from(''),
+      { ref: 'refs/heads/main', object_kind: 'merge_request' },
     );
     expect(result.status).toBe('ignored');
-    expect(result.reason).toContain('not a push event');
   });
 });

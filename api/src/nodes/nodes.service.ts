@@ -1,5 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { Pool } from 'pg';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class NodesService {
@@ -28,10 +29,16 @@ export class NodesService {
   }
 
   async update(id: string, data: any) {
+    const ALLOWED_KEYS = new Set([
+      'name', 'tailscale_ip', 'public_ip', 'status', 'role', 'access_mode',
+      'cpu_cores', 'ram_mb', 'disk_gb', 'arch', 'gpu_info',
+      'k3s_version', 'harbr_version', 'ssh_public_key',
+    ]);
     const sets: string[] = [];
     const vals: any[] = [];
     let idx = 1;
     for (const [key, val] of Object.entries(data)) {
+      if (!ALLOWED_KEYS.has(key)) continue; // whitelist to prevent injection
       if (key === 'gpu_info') {
         sets.push(`gpu_info = $${idx++}::jsonb`);
         vals.push(JSON.stringify(val));
@@ -40,9 +47,10 @@ export class NodesService {
         vals.push(val);
       }
     }
+    if (sets.length === 0) return this.findById(id);
     vals.push(id);
     const { rows } = await this.pool.query(
-      `UPDATE nodes SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
+      `UPDATE nodes SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${idx} RETURNING *`,
       vals,
     );
     return rows[0];
@@ -50,5 +58,33 @@ export class NodesService {
 
   async delete(id: string) {
     await this.pool.query('DELETE FROM nodes WHERE id = $1', [id]);
+  }
+
+  async generateJoinToken(): Promise<{ token: string; expires_at: Date }> {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await this.pool.query(
+      `INSERT INTO join_tokens (token_hash, expires_at, used)
+       VALUES ($1, $2, false)`,
+      [tokenHash, expiresAt],
+    );
+
+    return { token: rawToken, expires_at: expiresAt };
+  }
+
+  async consumeJoinToken(rawToken: string): Promise<boolean> {
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const { rows } = await this.pool.query(
+      `UPDATE join_tokens
+       SET used = true, used_at = NOW()
+       WHERE token_hash = $1
+         AND used = false
+         AND expires_at > NOW()
+       RETURNING id`,
+      [tokenHash],
+    );
+    return rows.length > 0;
   }
 }

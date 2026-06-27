@@ -1,9 +1,7 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { Controller, Get, Post, Param, Body } from '@nestjs/common';
 import { TemplatesService } from './templates.service';
 
 @Controller('templates')
-@UseGuards(AuthGuard('jwt'))
 export class TemplatesController {
   constructor(private templates: TemplatesService) {}
 
@@ -12,4 +10,12 @@ export class TemplatesController {
 
   @Get(':name')
   async findByName(@Param('name') name: string) { return this.templates.findByName(name); }
+
+  @Post(':name/deploy')
+  async deploy(
+    @Param('name') name: string,
+    @Body() body: { name: string; domain?: string; nodeSelector?: string; env?: Record<string, string> },
+  ) {
+    return this.templates.deployFromTemplate(name, body);
+  }
 }

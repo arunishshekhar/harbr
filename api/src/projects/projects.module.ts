@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
 import { ProjectsController } from './projects.controller';
 import { ProjectsService } from './projects.service';
+import { BuildsModule } from '../builds/builds.module';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: 'harbr-jobs' })],
+  imports: [BuildsModule],
   controllers: [ProjectsController],
   providers: [ProjectsService],
   exports: [ProjectsService],

@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type Project struct {
@@ -95,14 +96,17 @@ func (r *Reconciler) Start(ctx context.Context) {
 }
 
 func newK8sClient() (kubernetes.Interface, error) {
-	config, err := rest.InClusterConfig()
+	cfg, err := rest.InClusterConfig()
 	if err != nil {
-		config, err = rest.InClusterConfig()
+		// Fall back to default kubeconfig (dev/local environment)
+		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+		clientCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, nil)
+		cfg, err = clientCfg.ClientConfig()
 		if err != nil {
-			return nil, fmt.Errorf("no in-cluster config (running outside K8s?)")
+			return nil, fmt.Errorf("no k8s config available (in-cluster or kubeconfig): %w", err)
 		}
 	}
-	return kubernetes.NewForConfig(config)
+	return kubernetes.NewForConfig(cfg)
 }
 
 const fetchSQL = `
