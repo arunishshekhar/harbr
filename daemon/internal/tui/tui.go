@@ -432,17 +432,22 @@ func (m *model) waitForK3s(ctx context.Context) error {
 	script := `
 set -euo pipefail
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-# Wait for kubeconfig to exist (up to 30s)
-for i in {1..15}; do
+# Wait for kubeconfig to exist (up to 40s)
+for i in {1..20}; do
   if [ -f "$KUBECONFIG" ]; then break; fi
   sleep 2
 done
-# Wait for API to answer (up to 60s)
-for i in {1..30}; do
-  if kubectl get nodes &>/dev/null; then exit 0; fi
+
+# Wait for API to answer (up to 90s)
+for i in {1..45}; do
+  if /usr/local/bin/kubectl --kubeconfig="$KUBECONFIG" get nodes &>/dev/null; then exit 0; fi
   sleep 2
 done
-echo "K3s failed to become ready"
+
+echo "K3s failed to become ready. Checking system logs for K3s service..."
+systemctl status k3s --no-pager || true
+echo "--- K3s Journal Logs ---"
+journalctl -u k3s --no-pager | tail -n 50
 exit 1
 `
 	return runScript(strings.TrimSpace(script))(ctx)
