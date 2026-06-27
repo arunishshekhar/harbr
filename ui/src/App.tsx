@@ -5,12 +5,14 @@ import Deploy from './pages/Deploy';
 import Nodes from './pages/Nodes';
 import Logs from './pages/Logs';
 import Storage from './pages/Storage';
+import Network from './pages/Network';
 import Domains from './pages/Domains';
 import Webhooks from './pages/Webhooks';
 import Alerts from './pages/Alerts';
 import AuditLog from './pages/AuditLog';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+
 
 const NAV = [
   { to: '/',         label: 'Dashboard',  icon: '⬡',  exact: true },
@@ -19,6 +21,7 @@ const NAV = [
   { to: '/nodes',    label: 'Nodes',      icon: '◎' },
   { to: '/logs',     label: 'Logs',       icon: '≡' },
   { to: '/storage',  label: 'Storage',    icon: '◰' },
+  { to: '/network',  label: 'Network',    icon: '⬡' },
   { to: '/domains',  label: 'Domains',    icon: '⊕' },
   { to: '/webhooks', label: 'Webhooks',   icon: '⟲' },
   { to: '/alerts',   label: 'Alerts',     icon: '⚑' },
@@ -26,6 +29,7 @@ const NAV = [
   { to: '/users',    label: 'Users',      icon: '◉' },
   { to: '/settings', label: 'Settings',   icon: '⚙' },
 ];
+
 
 export default function App() {
   const location = useLocation();
@@ -115,6 +119,7 @@ export default function App() {
           <Route path="/nodes"     element={<Nodes />} />
           <Route path="/logs"      element={<Logs />} />
           <Route path="/storage"   element={<Storage />} />
+          <Route path="/network"   element={<Network />} />
           <Route path="/domains"   element={<Domains />} />
           <Route path="/webhooks"  element={<Webhooks />} />
           <Route path="/alerts"    element={<Alerts />} />

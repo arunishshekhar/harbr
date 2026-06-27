@@ -416,11 +416,51 @@ func (m *model) installK3sWithDSN(ctx context.Context) error {
 }
 
 func (m *model) configureCloudflare(ctx context.Context) error {
+	if os.Getenv("HARBR_DEV_MODE") != "" {
+		return nil
+	}
+	if m.cloudflareToken == "" {
+		return nil // no token = skip, valid for VPS mode
+	}
+	// Write the Cloudflare API token as a K8s secret used by Caddy + cert-manager
+	script := fmt.Sprintf(`kubectl -n harbr-system create secret generic cloudflare-dns-token \
+		--from-literal=token=%s \
+		--dry-run=client -o yaml | kubectl apply -f -`, m.cloudflareToken)
+	if err := runScript(script)(ctx); err != nil {
+		return fmt.Errorf("cloudflare secret: %w", err)
+	}
+	if m.setupPath == PathHomeServer {
+		// Write tunnelID env stub — user must supply actual tunnel ID
+		fmt.Println("NOTE: Set CLOUDFLARE_TUNNEL_ID + CLOUDFLARE_TUNNEL_CREDENTIALS in /etc/harbr/harbrd.env")
+	}
 	return nil
 }
 
 func (m *model) createAdminUser(ctx context.Context) error {
-	return nil
+	if os.Getenv("HARBR_DEV_MODE") != "" {
+		return nil
+	}
+	if m.adminUser == "" || m.adminPassword == "" {
+		return fmt.Errorf("admin user and password are required")
+	}
+	// Wait for API to be ready (max 90s)
+	for i := 0; i < 18; i++ {
+		cmd := exec.CommandContext(ctx, "curl", "-sf", "http://localhost:3001/health")
+		if cmd.Run() == nil {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
+	}
+	// POST to /api/v1/auth/register to create first admin
+	script := fmt.Sprintf(`curl -sf -X POST http://localhost:3001/api/v1/auth/register \
+		-H 'Content-Type: application/json' \
+		-d '{"username":"%s","password":"%s","role":"admin"}'`,
+		m.adminUser, m.adminPassword)
+	return runScript(script)(ctx)
 }
 
 func (m model) View() string {
@@ -607,5 +647,19 @@ func RunSetup() {
 func RunStatus() {
 	fmt.Println("Harbr Cluster Status")
 	fmt.Println("====================")
-	fmt.Println("Checking cluster health...")
+	// Try API first
+	cmd := exec.Command("curl", "-sf", "http://localhost:3001/api/v1/nodes")
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Println("API not reachable — checking local services:")
+		for _, svc := range []string{"harbrd", "postgresql", "k3s"} {
+			status := "✗"
+			if exec.Command("systemctl", "is-active", "--quiet", svc).Run() == nil {
+				status = "✓"
+			}
+			fmt.Printf("  %s %s\n", status, svc)
+		}
+		return
+	}
+	fmt.Printf("Nodes: %s\n", strings.TrimSpace(string(out)))
 }
