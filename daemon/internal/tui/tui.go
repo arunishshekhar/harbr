@@ -384,7 +384,7 @@ func (m *model) buildInstallSteps() {
 		m.installSteps = append(commonSteps,
 			installStep{"Setting up Postgres DB", m.setupPostgresDB},
 			installStep{"Installing K3s", runScriptSafe(
-				"set -euo pipefail; if command -v k3s &>/dev/null; then echo 'k3s already installed'; exit 0; fi; curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='--disable=traefik --write-kubeconfig-mode=644' sh -",
+				"set -euo pipefail; curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='--disable=traefik --write-kubeconfig-mode=644' sh -",
 			)},
 			installStep{"Waiting for K3s readiness", m.waitForK3s},
 			installStep{"Installing Harbr Daemon", runScriptSafe(
@@ -569,10 +569,6 @@ func (m *model) installK3sWithDSN(ctx context.Context) error {
 	dsn := fmt.Sprintf("postgres://harbr:%s@127.0.0.1:5432/harbr?sslmode=disable", password)
 	script := fmt.Sprintf(`
 set -euo pipefail
-if command -v k3s &>/dev/null; then
-  echo "k3s already installed"
-  exit 0
-fi
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='server --datastore-endpoint="%s" --disable=traefik --flannel-backend=none --disable-network-policy --write-kubeconfig-mode=644' sh -
 `, dsn)
 	return runScript(strings.TrimSpace(script))(ctx)
