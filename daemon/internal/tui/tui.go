@@ -569,7 +569,7 @@ func (m *model) installK3sWithDSN(ctx context.Context) error {
 	dsn := fmt.Sprintf("postgres://harbr:%s@127.0.0.1:5432/harbr?sslmode=disable", password)
 	script := fmt.Sprintf(`
 set -euo pipefail
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='server --datastore-endpoint="%s" --disable=traefik --flannel-backend=none --disable-network-policy --write-kubeconfig-mode=644' sh -
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='server --datastore-endpoint=%s --disable=traefik --flannel-backend=none --disable-network-policy --write-kubeconfig-mode=644' sh -
 `, dsn)
 	return runScript(strings.TrimSpace(script))(ctx)
 }
